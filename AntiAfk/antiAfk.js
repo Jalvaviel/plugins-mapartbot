@@ -1,47 +1,30 @@
 const { sleep } = require("mineflayer/lib/promise_utils");
+const PriorityEvent = require("../Utils/PriorityEvent");
 
-async function notAfk(bot, options) {
+async function swingArm(bot) {
     bot.emit('notAfk', true);
 
-    if (options.peep) {
-        const nearestEntity = bot.nearestEntity()?.position;
-        if (nearestEntity) {
-            await bot.lookAt(nearestEntity);
-        }
-    }
-
-    if (options.sneak) {
-        bot.setControlState('sneak', true);
-        await sleep(10);
-        bot.setControlState('sneak', false);
-    }
-
-    if (options.jump) {
-        bot.setControlState('jump', true);
-        await sleep(10);
-        bot.setControlState('jump', false);
-    }
-
-    if (options.swingArm) {
-        bot.swingArm("right");
-    }
+    bot.swingArm("right"); // Swing the right arm
 
     bot.emit('notAfk', false);
 }
 
-function antiAfk(bot, options = { peep: true, swingArm: true, sneak: false, jump: false }, priority = 1) {
-    bot.events.createEvent('notAfk', async () => await notAfk(bot, options), priority);
-    bot.events.interruptCurrentAction(priority);
+function isAfk(bot) {
+    // The bot is AFK if no tasks are in the queue
+    return bot.eventEmitter.queue.length === 0;
 }
 
-/**
- * Initializes the antiAfk plugin and sets up periodic execution.
- * @param {Object} bot - The mineflayer bot instance.
- */
-function antiAfkPlugin(bot, interval = 20000) {
-    setInterval(() => {
+function antiAfk(bot, priority = 1) {
+    if (isAfk(bot)) {
+        const event = new PriorityEvent('antiAfk', async () => await swingArm(bot), priority);
+        bot.eventEmitter.pushEvent(event);
+    }
+}
+
+function antiAfkPlugin(bot, interval = 5000) {
+    setInterval(async () => {
         antiAfk(bot);
     }, interval);
 }
 
-module.exports = bot => antiAfkPlugin(bot);
+module.exports = antiAfkPlugin;

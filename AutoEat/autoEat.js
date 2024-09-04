@@ -1,13 +1,7 @@
 const { readFileSync } = require('fs');
-const { sleep } = require('mineflayer/lib/promise_utils');
+const { sleep } = require("mineflayer/lib/promise_utils");
+const PriorityEvent = require("../Utils/PriorityEvent");
 
-/**
- * Makes the bot eat food. Yummy!
- * @param {Object} bot - The mineflayer bot instance.
- * @param {Array} foods - A list of the foods the bot likes. Should be ordered by preference.
- * @param {boolean} [offhand=false] - Eat from the offhand.
- * @returns {Promise<void>}
- */
 async function eat(bot, foods = JSON.parse(readFileSync('./AutoEat/foods.json')), offhand = false) {
     bot.emit('eat', true);
 
@@ -17,7 +11,7 @@ async function eat(bot, foods = JSON.parse(readFileSync('./AutoEat/foods.json'))
             bot.deactivateItem(); // Deactivate any held item (if applicable)
             bot.activateItem(); // Start eating
 
-            const initialCount = bot.heldItem.count;
+            const initialCount = bot.heldItem ? bot.heldItem.count : 0;
 
             try {
                 // Wait until the bot finishes eating or the item count decreases
@@ -35,25 +29,22 @@ async function eat(bot, foods = JSON.parse(readFileSync('./AutoEat/foods.json'))
     bot.emit('eat', false);
 }
 
-/**
- * Calls the eat function using a queue of events of the type PriorityEventEmitter.
- * @param {Object} bot - The mineflayer bot instance.
- * @param {Array} [foods=JSON.parse(readFileSync('./foods.json'))] - A list of the foods the bot likes.
- * @param {boolean} [offhand=false] - Eat from the offhand.
- * @param {number} [hungerThreshold=10] - The hunger threshold to check before activating.
- * @param {number} [healthThreshold=10] - The health threshold to check before activating.
- * @param {number} [priority=10] - The priority of the event.
- */
-function autoEat(bot, foods = JSON.parse(readFileSync('./AutoEat/foods.json')), offhand = false, hungerThreshold = 10, healthThreshold = 0, priority = 10) {
-    if (bot.food < hungerThreshold || bot.health < healthThreshold) {
-        bot.events.createEvent('eat', async () => await eat(bot, foods, offhand), priority);
-    }
+async function checkHunger(bot, threshold = 10) {
+    // Check if the bot's hunger level is below the threshold
+    return bot.food < threshold;
 }
 
-function autoEatPlugin(bot, interval = 1000) {
-    setInterval(() => {
-        autoEat(bot);
+function autoEat(bot, foods, offhand = false, priority = 10) {
+    const event = new PriorityEvent('autoEat', async () => await eat(bot, foods, offhand), priority);
+    bot.eventEmitter.pushEvent(event);
+}
+
+function autoEatPlugin(bot, interval = 1000, threshold = 10, foods = JSON.parse(readFileSync('./AutoEat/foods.json')), offhand = false, priority = 10) {
+    setInterval(async () => {
+        if (await checkHunger(bot, threshold)) {
+            autoEat(bot, foods, offhand, priority);
+        }
     }, interval);
 }
 
-module.exports = bot => { autoEatPlugin(bot), eat(bot) }
+module.exports = autoEatPlugin;
