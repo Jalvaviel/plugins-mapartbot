@@ -1,7 +1,7 @@
 const { GoalNear } = require('mineflayer-pathfinder').goals;
 const Vec3 = require("vec3");
 
-async function getBlockInArea(world, corner, dimensions, blockName) {
+async function getMaterialChest(world, corner, dimensions, blockName) {
     for (let z = corner.z; z <= corner.z + dimensions.z; z++) {
         for (let x = corner.x; x <= corner.x + dimensions.x; x++) {
             for (let y = corner.y; y <= corner.y + dimensions.y; y++) {
@@ -23,18 +23,18 @@ async function replenishMaterial(bot, material, blockname = material, quantity =
 
     switch (sorter) {
         case "north":
-            matChest = await getBlockInArea(bot.world, new Vec3(corner.x, corner.y - 1, corner.z - sorterSize.z), sorterSize, blockname);
+            matChest = await getMaterialChest(bot.world, new Vec3(corner.x, corner.y - 1, corner.z - sorterSize.z), sorterSize, blockname);
             break;
         case "south":
-            matChest = await getBlockInArea(bot.world, new Vec3(corner.x, corner.y - 1, corner.z + structureSize.z), sorterSize, blockname);
+            matChest = await getMaterialChest(bot.world, new Vec3(corner.x, corner.y - 1, corner.z + structureSize.z), sorterSize, blockname);
             break;
         case "west":
             [sorterSize.x, sorterSize.z] = [sorterSize.z, sorterSize.x]; // Swap values
-            matChest = await getBlockInArea(bot.world, new Vec3(corner.x - sorterSize.x, corner.y - 1, corner.z), sorterSize, blocknamel);
+            matChest = await getMaterialChest(bot.world, new Vec3(corner.x - sorterSize.x, corner.y - 1, corner.z), sorterSize, blocknamel);
             break;
         case "east":
             [sorterSize.x, sorterSize.z] = [sorterSize.z, sorterSize.x]; // Swap values
-            matChest = await getBlockInArea(bot.world, new Vec3(sorterSize.x + structureSize.x, corner.y - 1, corner.z), sorterSize, blockname);
+            matChest = await getMaterialChest(bot.world, new Vec3(sorterSize.x + structureSize.x, corner.y - 1, corner.z), sorterSize, blockname);
             break;
     }
 

@@ -10,7 +10,7 @@ const { isInside,
 const {goalWithTimeout} = require("../BlockFinder/goalWithTimeout");
 const PriorityEvent = require("../Utils/PriorityEvent");
 const {EventStatus} = require("../Utils/EventStatus");
-async function equipBestTool(bot, block, nukerPacketCount = { value: 0 }) {
+async function equipBestTool(bot, block, nukerPacketCount = { value: 0 }, saveUses = true) {
     const pickaxes = [
         bot.registry.itemsByName['wooden_pickaxe'].id,
         bot.registry.itemsByName['stone_pickaxe'].id,
@@ -82,8 +82,10 @@ async function equipBestTool(bot, block, nukerPacketCount = { value: 0 }) {
             }
         } else if (blockMaterial.includes("default")) {
             for (let item of bot.inventory.items()) {
-                if (!pickaxes.includes(item.type) && !axes.includes(item.type) && !shovels.includes(item.type) && !hoes.includes(item.type)) {
-                    bestTool = item;
+                if (saveUses) {
+                    if (!pickaxes.includes(item.type) && !axes.includes(item.type) && !shovels.includes(item.type) && !hoes.includes(item.type)) {
+                        bestTool = item;
+                    }
                 }
             }
         }

@@ -8,17 +8,6 @@ class PriorityEventEmitter extends EventEmitter {
         this.isProcessing = false;
     }
 
-    isInQueue(event) {
-        return this.queue.some(queuedEvent => queuedEvent.name === event.name);
-    }
-
-    updateEvent(event) {
-        const index = this.queue.findIndex(queuedEvent => queuedEvent.name === event.name);
-        if (index !== -1) {
-            this.queue[index] = event;
-        }
-    }
-
     sortQueue() {
         this.queue = this.queue.filter(event => event.status !== 'COMPLETED' && event.status !== 'FAILED');
         this.queue.sort((a, b) => b.priority - a.priority);
@@ -30,7 +19,7 @@ class PriorityEventEmitter extends EventEmitter {
 
         while (this.queue.length > 0) {
             if (this.runningEvent && this.runningEvent.abortController.signal.aborted) {
-                console.log(`Event ${this.runningEvent.name} was aborted.`);
+                //console.log(`Event ${this.runningEvent.name} was aborted.`);
                 this.runningEvent = null;
             }
 
@@ -41,7 +30,7 @@ class PriorityEventEmitter extends EventEmitter {
                 await this.runningEvent.action();
                 this.runningEvent.status = 'COMPLETED';
             } catch (e) {
-                console.error(`Event ${this.runningEvent ? this.runningEvent.name : 'unknown'} failed: ${e}`);
+                //console.error(`Event ${this.runningEvent ? this.runningEvent.name : 'unknown'} failed: ${e}`);
                 if (this.runningEvent) {
                     this.runningEvent.status = 'FAILED';
                 }
@@ -59,22 +48,17 @@ class PriorityEventEmitter extends EventEmitter {
 
     pushEvent(event) {
         if (!event) {
-            console.error('Cannot add an undefined event to the queue.');
+            //console.error('Cannot add an undefined event to the queue.');
             return;
         }
 
         const existingEvent = this.queue.find(queuedEvent => queuedEvent.name === event.name && queuedEvent.status === 'PENDING');
         if (existingEvent) {
-            console.warn(`An event of the same type ${event.name} is already in the queue, skipping...`);
+            //console.warn(`An event of the same type ${event.name} is already in the queue, skipping...`);
             return;
-        }
-
-        if (this.isInQueue(event)) {
-            console.warn(`An event of the same type ${event.name} is in queue, updating...`);
-            this.updateEvent(event);
-        } else {
+        }else {
             this.queue.push(event);
-            console.log(`Added event ${event.name} to queue.`);
+            //console.log(`Added event ${event.name} to queue.`);
         }
 
         this.sortQueue();
