@@ -1,4 +1,5 @@
 const {Vec3} = require("vec3");
+const {isInside} = require("../BlockUtils/boundingBox");
 
 function dijkstra(bot, excludes, boundingBox) {
     const start = bot.entity.position.floored();
@@ -188,16 +189,8 @@ function spiral(bot, excludes, boundingBox) {
     return null;
 }
 
-function isInside(block, boundingBox) {
-    const blockPos = block.position;
-    if (boundingBox === null) return true;
-    return (boundingBox[0].x <= blockPos.x && blockPos.x <= boundingBox[1].x) &&
-        (boundingBox[0].y <= blockPos.y && blockPos.y <= boundingBox[1].y) &&
-        (boundingBox[0].z <= blockPos.z && blockPos.z <= boundingBox[1].z);
-}
 
 module.exports = {
-    isInside,
     dijkstra,
     scanner,
     customScanner,

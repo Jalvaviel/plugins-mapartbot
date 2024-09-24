@@ -3,11 +3,14 @@ const autoEatPlugin = require('./AutoEat/autoEat');
 const antiAfk = require('./AntiAfk/antiAfk');
 const {pathfinder} = require('mineflayer-pathfinder');
 const { Movements } = require('mineflayer-pathfinder');
-const { nuker } = require('./Nuker/nuker');
+const { nuker, createNuker} = require('./Nuker/nuker');
 const { sleep } = require("mineflayer/lib/promise_utils");
-const PriorityEventEmitter = require('./Utils/PriorityEventEmitter');
+const PriorityEventEmitter = require('./Utils/old/PriorityEventEmitter');
 const { Vec3 } = require("vec3");
 const { readFileSync } = require('fs');
+const {AntiAfk, createAntiAfk} = require("./AntiAfk/antiAfk");
+const PriorityQueue = require("./Utils/PriorityQueue");
+const {createAutoEat} = require("./AutoEat/autoEat");
 
 let startMinecraftBot = (host, port, username) => {
     return mineflayer.createBot({
@@ -23,16 +26,27 @@ let bot = startMinecraftBot("0.0.0.0", 25566, 'jalvabot@outlook.es');
 bot.loadPlugin(pathfinder)
 
 // Initialize the event emitter and assign it to the bot
-bot.eventEmitter = new PriorityEventEmitter();
+bot.prioQ = new PriorityQueue();
 
-// Start the anti-AFK handler
-antiAfk(bot, 5000); // Check every 5 seconds
+let pluginsWithInterval = async () => {
+    setInterval(() => {
+    createAntiAfk(bot.prioQ,bot,1);
+    },10000);
+    setInterval(() => {
+        createAutoEat(bot.prioQ,bot,10);
+    },2000);
+}
 
-// Start the autoEat handler
-autoEatPlugin(bot); // higher priority for eating
+let logTheFuckingQueue = async () => {
+    setInterval(() => {
+    console.log(bot.prioQ.queue)
+    },1000);
+}
 
 bot.on('spawn', () => {
     console.log('Bot has spawned');
+    pluginsWithInterval();
+    //logTheFuckingQueue()
 });
 
 bot.on('error', (err) => {
@@ -46,6 +60,6 @@ bot.on('end', () => {
 
 bot.on("chat", async (username, message) => {
     if (message === '!nuke'){
-        nuker(bot);
+        createNuker(bot.prioQ, bot, 6);
     }
 });
