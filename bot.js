@@ -26,20 +26,20 @@ let bot = startMinecraftBot("0.0.0.0", 25566, 'jalvabot@outlook.es');
 bot.loadPlugin(pathfinder)
 
 // Initialize the event emitter and assign it to the bot
-bot.prioQ = new PriorityQueue();
+prioQ = new PriorityQueue(bot);
 
 let pluginsWithInterval = async () => {
     setInterval(() => {
-    createAntiAfk(bot.prioQ,bot,1);
+    createAntiAfk(prioQ,bot,1);
     },10000);
     setInterval(() => {
-        createAutoEat(bot.prioQ,bot,10);
+        createAutoEat(prioQ,bot,10);
     },2000);
 }
 
 let logTheFuckingQueue = async () => {
     setInterval(() => {
-    console.log(bot.prioQ.queue)
+    console.log(prioQ.queue)
     },1000);
 }
 
@@ -60,6 +60,6 @@ bot.on('end', () => {
 
 bot.on("chat", async (username, message) => {
     if (message === '!nuke'){
-        createNuker(bot.prioQ, bot, 6);
+        createNuker(prioQ, bot, 6);
     }
 });
