@@ -1,11 +1,11 @@
 const { Vec3 } = require("vec3");
 const { sleep } = require("mineflayer/lib/promise_utils");
-const { scanner, spiral } = require('../BlockFinder/algorithms');
-const { goalWithTimeout } = require("../BlockFinder/goalWithTimeout");
+const { scanner, spiral } = require('../../utils/BlockFinder/algorithms');
+const { goalWithTimeout } = require("../../utils/BlockFinder/goalWithTimeout");
 const { readFileSync} = require("fs");
-const { boundingBox, isInside } = require("../BlockUtils/boundingBox");
-const PriorityEvent = require("../Utils/old/PriorityEvent");
-const {EventStatus} = require("../Utils/EventStatus");
+const { boundingBox, isInside } = require("../../utils/BlockUtils/boundingBox");
+const PriorityEvent = require("../../utils/old/PriorityEvent");
+const {EventStatus} = require("../../utils/EventStatus");
 
 class Nuker {
     constructor(bot, abort = null, config = JSON.parse(readFileSync("./Nuker/config.json"))) {
@@ -15,7 +15,7 @@ class Nuker {
         if (this.config.boundingBox === "auto") {
             this.boundingBox = boundingBox(this.bot.entity.position);
         } else {
-            this.boundingBox = new Vec3(this.config.boundingBox[0],this.config.boundingBox[1],this.config.boundingBox[2]);
+            this.boundingBox = [new Vec3(this.config.boundingBox[0],this.config.boundingBox[1],this.config.boundingBox[2]), new Vec3(this.config.boundingBox[3],this.config.boundingBox[4],this.config.boundingBox[5])];
         }
         //this.boundingBox = this.config.boundingBox === "auto" ? boundingBox(this.bot.entity.position) : new Vec3(this.config.boundingBox[0],this.config.boundingBox[1],this.config.boundingBox[2]);
         this.abort = abort;
@@ -160,18 +160,14 @@ class Nuker {
         let botPos = this.bot.entity.position;
         botPos = new Vec3(Math.floor(botPos.x), Math.floor(botPos.y), Math.floor(botPos.z));
         while (true) {
-            /*while(this.nukerPacketCount > 0) {
-                this.nukerPacketCount--;
-            }
-             */
             let blockFound = false;
             for (let z = botPos.z - this.config.range; z <= botPos.z + this.config.range; z++) {
                 for (let x = botPos.x - this.config.range; x <= botPos.x + this.config.range; x++) {
                     for (let y = botPos.y; y <= botPos.y + this.config.range; y++) {
                         const block = this.bot.world.getBlock(new Vec3(x, y, z));
                         if (botPos.distanceTo(block.position) <= this.config.range) {
-                            if (!this.config.excludes.includes(block.name) && isInside(block, this.boundingBox) && block.name !== 'air') {
-                                if (this.canMine(block)) {
+                            if (this.config.includes.includes(block.name) && isInside(block, this.boundingBox) && block.name !== 'air') {
+                                if (this.canMine(block) && block.material) {
                                     await this.breakBlock(block);
                                 } else {
                                     this.nukerPacketCount--;
@@ -195,13 +191,13 @@ class Nuker {
         }
         switch (this.config.searchMode) {
             case "scanner":
-                return scanner(this.bot, this.config.excludes, this.boundingBox);
+                return scanner(this.bot, this.config.includes, this.boundingBox);
                 break;
             case "spiral":
-                return spiral(this.bot, this.config.excludes, this.boundingBox);
+                return spiral(this.bot, this.config.includes, this.boundingBox);
                 break;
             default:
-                return spiral(this.bot, this.config.excludes, this.boundingBox);
+                return spiral(this.bot, this.config.includes, this.boundingBox);
                 break;
         }
     }

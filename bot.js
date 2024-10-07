@@ -1,16 +1,19 @@
 const mineflayer = require('mineflayer');
-const autoEatPlugin = require('./AutoEat/autoEat');
-const antiAfk = require('./AntiAfk/antiAfk');
-const {pathfinder} = require('mineflayer-pathfinder');
+const autoEatPlugin = require('./modules/AutoEat/autoEat');
+const antiAfk = require('./modules/AntiAfk/antiAfk');
+const { pathfinder } = require('mineflayer-pathfinder');
+//const { inventory } = require('./node_modules/mineflayer/examples/inventory.js');
 const { Movements } = require('mineflayer-pathfinder');
-const { nuker, createNuker} = require('./Nuker/nuker');
+const { nuker, createNuker} = require('./modules/Nuker/nuker');
 const { sleep } = require("mineflayer/lib/promise_utils");
-const PriorityEventEmitter = require('./Utils/old/PriorityEventEmitter');
+const PriorityEventEmitter = require('./utils/old/PriorityEventEmitter');
 const { Vec3 } = require("vec3");
 const { readFileSync } = require('fs');
-const {AntiAfk, createAntiAfk} = require("./AntiAfk/antiAfk");
-const PriorityQueue = require("./Utils/PriorityQueue");
-const {createAutoEat} = require("./AutoEat/autoEat");
+const {AntiAfk, createAntiAfk} = require("./modules/AntiAfk/antiAfk");
+const PriorityQueue = require("./utils/PriorityQueue");
+const {createAutoEat} = require("./modules/AutoEat/autoEat");
+const InventoryManager = require("./utils/InventoryManager/inventoryManager.js");
+const AntiBreak = require("./modules/AntiBreak/antiBreak");
 
 let startMinecraftBot = (host, port, username) => {
     return mineflayer.createBot({
@@ -23,7 +26,8 @@ let startMinecraftBot = (host, port, username) => {
 
 // Create the bot
 let bot = startMinecraftBot("0.0.0.0", 25566, 'jalvabot@outlook.es');
-bot.loadPlugin(pathfinder)
+bot.loadPlugin(pathfinder);
+//bot.loadPlugin(inventory);
 
 // Initialize the event emitter and assign it to the bot
 prioQ = new PriorityQueue(bot);
@@ -37,16 +41,17 @@ let pluginsWithInterval = async () => {
     },2000);
 }
 
-let logTheFuckingQueue = async () => {
-    setInterval(() => {
-    console.log(prioQ.queue)
-    },1000);
+let pathfinderMovements = () => {
+    const movements = new Movements(bot);
+    movements.canDig = false;
+    movements.allow1by1towers = false;
+    bot.pathfinder.setMovements(movements);
 }
 
 bot.on('spawn', () => {
     console.log('Bot has spawned');
     pluginsWithInterval();
-    //logTheFuckingQueue()
+    pathfinderMovements();
 });
 
 bot.on('error', (err) => {
@@ -61,5 +66,13 @@ bot.on('end', () => {
 bot.on("chat", async (username, message) => {
     if (message === '!nuke'){
         createNuker(prioQ, bot, 6);
+    }
+    if (message === '!inv'){
+        let invManager = new InventoryManager(bot);
+        await invManager.depositItems("white_carpet",1024);
+    }
+    if (message === '!ab'){
+        let antiBreak = new AntiBreak(bot);
+        await antiBreak.dumpAndPickup();
     }
 });

@@ -13,7 +13,7 @@ async function getMaterialChest(world, corner, dimensions, blockName) {
     }
     return null;
 }
-async function replenishMaterial(bot, material, blockname = material, quantity = 64) {
+async function replenishMaterial(bot, material, blockname = material, quantity = 64,) {
     const MAX_INVENTORY = bot.builder.options.maxReplenishItems;
     const sorter = bot.builder.options.sorter;
     const corner = bot.builder.options.corner;

@@ -49,7 +49,8 @@ function dijkstra(bot, excludes, boundingBox) {
     return null;
 }
 
-function scanner(bot, excludes, boundingBox) {
+function scanner(bot, includes, boundingBox) {
+    includes = (Array.isArray(includes)) ? includes : [includes];
     const playerPos = bot.entity.position.floored();
     let nearestBlock = null;
     let minDistance = Infinity;
@@ -60,7 +61,7 @@ function scanner(bot, excludes, boundingBox) {
                 const block = bot.world.getBlock(new Vec3(x, y, z));
                 let currentDistance = block.position.distanceTo(playerPos);
                 if (currentDistance < minDistance) {
-                    if (!excludes.includes(block.name) && block.name !== 'air' && isInside(block, boundingBox)) {
+                    if (includes.includes(block.name) && block.name !== 'air' && isInside(block, boundingBox)) {
                         minDistance = currentDistance;
                         nearestBlock = block;
                     }
@@ -115,7 +116,8 @@ function customScanner(bot, excludes, boundingBox, exploredPos = {value: []}) {
     }
     return nearestBlock;
 }
-function spiral(bot, excludes, boundingBox) {
+function spiral(bot, includes, boundingBox) {
+    includes = (Array.isArray(includes)) ? includes : [includes];
     const playerPos = bot.entity.position.floored();
     const directions = [
         new Vec3(0, 0, -1),  // South
@@ -146,7 +148,7 @@ function spiral(bot, excludes, boundingBox) {
     while (true) {
         // Check for block at current position
         const block = bot.world.getBlock(currentVector);
-        if (!excludes.includes(block.name) && block.name !== 'air' && isInside(block, boundingBox)) {
+        if (includes.includes(block.name) && block.name !== 'air' && isInside(block, boundingBox)) {
             return block;
         }
 

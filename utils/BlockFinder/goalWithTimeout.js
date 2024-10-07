@@ -5,7 +5,7 @@ function getRandomInt(min, max) {
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-async function goalWithTimeout(bot, goalPos, timeout = 30000, reach = 1) { // todo event system keep fucking up this part.
+async function goalWithTimeout(bot, goalPos, timeout = 30000, reach = 1) {
     const goal = new GoalNear(goalPos.x, goalPos.y, goalPos.z, reach)
     try {
         await Promise.race([

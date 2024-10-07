@@ -1,5 +1,5 @@
 const { sleep } = require("mineflayer/lib/promise_utils");
-const PriorityEvent = require("../Utils/old/PriorityEvent");
+const PriorityEvent = require("../../utils/old/PriorityEvent");
 
 class AntiAfk {
     constructor(bot) {

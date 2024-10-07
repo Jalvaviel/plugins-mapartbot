@@ -1,7 +1,7 @@
 const { readFileSync } = require('fs');
 const { sleep } = require("mineflayer/lib/promise_utils");
-const PriorityEvent = require("../Utils/old/PriorityEvent");
-const { EventStatus } = require("../Utils/old/EventStatus");
+const PriorityEvent = require("../../utils/old/PriorityEvent");
+const { EventStatus } = require("../../utils/old/EventStatus");
 
 class AutoEat {
     constructor(bot, foods = JSON.parse(readFileSync("./AutoEat/foods.json")), config = JSON.parse(readFileSync("./AutoEat/config.json"))) {
