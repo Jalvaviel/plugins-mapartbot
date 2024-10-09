@@ -1,0 +1,16 @@
+{
+  "range" : 4,
+  "blockMode" : "excludes",
+  "includes" : [],
+  "excludes" : ["air"],
+  "boundingBox" : "auto",
+  "miningMode" : "packet",
+  "searchMode" : "spiral",
+  "nukerPacketLimit" : 10,
+  "saveUses" : true,
+  "noobline" : true,
+  "cooldown": 0,
+  "instaMineThreshold": 67,
+  "blockTimeoutDelay": 300,
+  "miningBlockBufferSize": 2
+}

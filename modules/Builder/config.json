@@ -1,0 +1,10 @@
+{
+  "cameraSpeed": 1000,
+  "range" : 4,
+  "corner" : "auto",
+  "boundingBox" : "auto",
+  "mode" : "airplace",
+  "searchMode" : "spiral",
+  "noobline" : true,
+  "cooldown": 0
+}

@@ -1,0 +1,9 @@
+{
+  "searchMode": "spiral",
+  "storageSystemPosition": "north",
+  "storageSystemSize": [128,10,8],
+  "materialStoragePath": ".\\minecraft\\materialstorage.json",
+  "hasSorter": false,
+  "sorterBlock": "barrel",
+  "maxWithdraw": 1728
+}

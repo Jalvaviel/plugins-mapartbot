@@ -1,0 +1,10 @@
+{
+  "netherite_pickaxe": "netherite_block",
+  "netherite_axe": "netherite_block",
+  "netherite_shovel": "netherite_block",
+  "netherite_hoe": "netherite_block",
+  "diamond_pickaxe": "diamond_block",
+  "diamond_axe": "diamond_block",
+  "diamond_shovel": "diamond_block",
+  "diamond_hoe": "diamond_block"
+}

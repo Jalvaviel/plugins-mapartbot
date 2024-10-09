@@ -1,0 +1,7 @@
+{
+  "map": "cartography_table",
+  "glass_pane": "cartography_table",
+
+  "trash": "trapped_chest",
+  "filled_map": "stripped_birch_wood"
+}
