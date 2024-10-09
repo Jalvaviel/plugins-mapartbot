@@ -1,18 +1,9 @@
 const mineflayer = require('mineflayer');
-const autoEatPlugin = require('./modules/AutoEat/autoEat');
-const antiAfk = require('./modules/AntiAfk/antiAfk');
 const { pathfinder } = require('mineflayer-pathfinder');
-//const { inventory } = require('./node_modules/mineflayer/examples/inventory.js');
 const { Movements } = require('mineflayer-pathfinder');
-const { nuker, createNuker} = require('./modules/Nuker/nuker');
-const { sleep } = require("mineflayer/lib/promise_utils");
-const PriorityEventEmitter = require('./utils/old/PriorityEventEmitter');
-const { Vec3 } = require("vec3");
-const { readFileSync } = require('fs');
-const {AntiAfk, createAntiAfk} = require("./modules/AntiAfk/antiAfk");
-const PriorityQueue = require("./utils/PriorityQueue");
-const {createAutoEat} = require("./modules/AutoEat/autoEat");
-const InventoryManager = require("./utils/InventoryManager/inventoryManager.js");
+const {Nuker}  = require('./modules/Nuker/nuker');
+const {AutoEat} = require("./modules/AutoEat/autoEat");
+const {InventoryManager} = require("./utils/InventoryManager/inventoryManager");
 const AntiBreak = require("./modules/AntiBreak/antiBreak");
 
 let startMinecraftBot = (host, port, username) => {
@@ -25,21 +16,8 @@ let startMinecraftBot = (host, port, username) => {
 }
 
 // Create the bot
-let bot = startMinecraftBot("0.0.0.0", 25566, 'jalvabot@outlook.es');
+let bot = startMinecraftBot("0.0.0.0", 25567, 'jalvabot@outlook.es');
 bot.loadPlugin(pathfinder);
-//bot.loadPlugin(inventory);
-
-// Initialize the event emitter and assign it to the bot
-prioQ = new PriorityQueue(bot);
-
-let pluginsWithInterval = async () => {
-    setInterval(() => {
-    createAntiAfk(prioQ,bot,1);
-    },10000);
-    setInterval(() => {
-        createAutoEat(prioQ,bot,10);
-    },2000);
-}
 
 let pathfinderMovements = () => {
     const movements = new Movements(bot);
@@ -50,8 +28,11 @@ let pathfinderMovements = () => {
 
 bot.on('spawn', () => {
     console.log('Bot has spawned');
-    pluginsWithInterval();
     pathfinderMovements();
+    const autoEat = new AutoEat(bot);
+    const antiBreak = new AntiBreak(bot);
+    autoEat.activate();
+    antiBreak.activate();
 });
 
 bot.on('error', (err) => {
@@ -65,7 +46,12 @@ bot.on('end', () => {
 
 bot.on("chat", async (username, message) => {
     if (message === '!nuke'){
-        createNuker(prioQ, bot, 6);
+        const nuker = new Nuker(bot);
+        //let nnb = nuker.nearestNukerBlock()
+        //await(nuker.nukeInRange());
+        //await(nuker.equipBestTool(nnb));
+        //console.log(bot.digTime(nnb), nnb.name);
+        await nuker.activate();
     }
     if (message === '!inv'){
         let invManager = new InventoryManager(bot);

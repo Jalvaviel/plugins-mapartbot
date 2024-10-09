@@ -49,8 +49,8 @@ function dijkstra(bot, excludes, boundingBox) {
     return null;
 }
 
-function scanner(bot, includes, boundingBox) {
-    includes = (Array.isArray(includes)) ? includes : [includes];
+function scanner(bot, blockMode, blockList, boundingBox) {
+    blockList = (Array.isArray(blockList)) ? blockList : [blockList];
     const playerPos = bot.entity.position.floored();
     let nearestBlock = null;
     let minDistance = Infinity;
@@ -61,7 +61,9 @@ function scanner(bot, includes, boundingBox) {
                 const block = bot.world.getBlock(new Vec3(x, y, z));
                 let currentDistance = block.position.distanceTo(playerPos);
                 if (currentDistance < minDistance) {
-                    if (includes.includes(block.name) && block.name !== 'air' && isInside(block, boundingBox)) {
+                    const mode = (blockMode === "includes" && blockList.includes(block.name)) ||
+                        (blockMode === "excludes" && !blockList.includes(block.name));
+                    if (mode && block.name !== 'air' && isInside(block, boundingBox)) {
                         minDistance = currentDistance;
                         nearestBlock = block;
                     }
@@ -116,8 +118,8 @@ function customScanner(bot, excludes, boundingBox, exploredPos = {value: []}) {
     }
     return nearestBlock;
 }
-function spiral(bot, includes, boundingBox) {
-    includes = (Array.isArray(includes)) ? includes : [includes];
+function spiral(bot, blockMode, blockList, boundingBox) {
+    blockList = (Array.isArray(blockList)) ? blockList : [blockList];
     const playerPos = bot.entity.position.floored();
     const directions = [
         new Vec3(0, 0, -1),  // South
@@ -148,7 +150,9 @@ function spiral(bot, includes, boundingBox) {
     while (true) {
         // Check for block at current position
         const block = bot.world.getBlock(currentVector);
-        if (includes.includes(block.name) && block.name !== 'air' && isInside(block, boundingBox)) {
+        const mode = (blockMode === "includes" && blockList.includes(block.name)) ||
+            (blockMode === "excludes" && !blockList.includes(block.name));
+        if (block.name !== 'air' && isInside(block, boundingBox)) { // mode
             return block;
         }
 

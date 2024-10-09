@@ -9,7 +9,13 @@ async function goalWithTimeout(bot, goalPos, timeout = 30000, reach = 1) {
     const goal = new GoalNear(goalPos.x, goalPos.y, goalPos.z, reach)
     try {
         await Promise.race([
-            bot.pathfinder.goto(goal),
+            (async () => {
+                try {
+                    await bot.pathfinder.goto(goal); // Try going to the goal
+                } catch (e) {
+                    console.error("Pathfinding error:", e); // Log the error without throwing
+                }
+            })(),
             new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Pathfinding timed out')), timeout)
             )

@@ -1,7 +1,7 @@
 const NBTStructure = require("./NBTStructure");
 const WorldStructure = require("./WorldStructure");
 const Vec3 = require("vec3");
-const {getEmptyBlockMatrix} = require("../../utils/structureUtils");
+const { getEmptyBlockMatrix } = require("./VerifyStructure");
 
 class Structure {
     constructor(palette, size, blockMatrix, materialList) {

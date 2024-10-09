@@ -4,21 +4,41 @@ const { scanner, spiral } = require('../../utils/BlockFinder/algorithms');
 const { goalWithTimeout } = require("../../utils/BlockFinder/goalWithTimeout");
 const { readFileSync} = require("fs");
 const { boundingBox, isInside } = require("../../utils/BlockUtils/boundingBox");
-const PriorityEvent = require("../../utils/old/PriorityEvent");
-const {EventStatus} = require("../../utils/EventStatus");
+const { offsetFromWorldBlock } = require("../../utils/StructureUtils/VerifyStructure");
 
 class Nuker {
-    constructor(bot, abort = null, config = JSON.parse(readFileSync("./Nuker/config.json"))) {
+    constructor(bot, structure = null, config = JSON.parse(readFileSync("./modules/Nuker/config.json"))) {
         this.bot = bot;
         this.config = config;
         this.nukerPacketCount = 0;
-        if (this.config.boundingBox === "auto") {
-            this.boundingBox = boundingBox(this.bot.entity.position);
-        } else {
-            this.boundingBox = [new Vec3(this.config.boundingBox[0],this.config.boundingBox[1],this.config.boundingBox[2]), new Vec3(this.config.boundingBox[3],this.config.boundingBox[4],this.config.boundingBox[5])];
-        }
-        //this.boundingBox = this.config.boundingBox === "auto" ? boundingBox(this.bot.entity.position) : new Vec3(this.config.boundingBox[0],this.config.boundingBox[1],this.config.boundingBox[2]);
-        this.abort = abort;
+        this.boundingBox = this.config.boundingBox === "auto"
+            ? boundingBox(this.bot.entity.position)
+            : [new Vec3(...this.config.boundingBox.slice(0, 3)), new Vec3(...this.config.boundingBox.slice(3, 6))];
+        this.structure = structure;
+        //this.miningBlocks = [];
+        this.blockTimeoutList = [];
+        this.stop = false;
+        this.addListeners();
+    }
+
+    addListeners() {
+        this.bot.on('eat', (eatEvent) => {
+            if (eatEvent.eating) {
+                this.stop = true;
+                this.bot.pathfinder.stop();
+            } else {
+                this.stop = false;
+            }
+        });
+
+        this.bot.on('replenishTools', (replenishEvent) => {
+            if (replenishEvent.replenishing) {
+                this.stop = true;
+                this.bot.pathfinder.stop();
+            } else {
+                this.stop = false;
+            }
+        });
     }
     
     async equipBestTool(block) {
@@ -103,6 +123,7 @@ class Nuker {
 
             if (bestTool !== null) {
                 await this.bot.equip(bestTool, "hand");
+                //console.log(bestTool.name,block.name,block.position);
                 this.nukerPacketCount++;
             }
 
@@ -110,24 +131,22 @@ class Nuker {
             console.error(e);
         }
     }
-    
-    async _breakWithPacket(block){
-        this.nukerPacketCount += (this.bot.digTime(block) > 50) ? 3 : 1
-        await this.equipBestTool(block);
-        if (this.bot.digTime(block) < 50) {
+
+    _breakWithPacket(block){
+        const breakingTime = this.bot.digTime(block);
+        //console.log("Digtime of block:",block.name,block.position,breakingTime);
+        const mineThreshold = this.config.instaMineThreshold;
+        const miningBlock = {"block": block, "ttm": breakingTime, "timeout": Date.now()}
+        if (breakingTime > mineThreshold) { // TODO, looks like the problem might lie here
+            //console.log("The block is not instaminable (breakingTime > mineThreshold)", breakingTime);
+            this.blockTimeoutList.push(miningBlock);
             this.bot._client.write('block_dig', {
                 status: 0, // start digging
                 location: block.position,
                 face: 1
             });
-        } else {
             this.bot._client.write('block_dig', {
-                status: 2, // stop digging
-                location: block.position,
-                face: 1
-            });
-            this.bot._client.write('block_dig', {
-                status: 0, // start digging
+                status: 1, // abort digging
                 location: block.position,
                 face: 1
             });
@@ -137,76 +156,148 @@ class Nuker {
                 face: 1
             });
         }
+
+        if (breakingTime <= mineThreshold) {
+            if (breakingTime > 50) {
+                //console.log("The block can be instamined by cheating the system", breakingTime);
+                this.bot._client.write('block_dig', {
+                    status: 2, // stop digging
+                    location: block.position,
+                    face: 1
+                });
+                this.bot._client.write('block_dig', {
+                    status: 0, // start digging
+                    location: block.position,
+                    face: 1
+                });
+                this.bot._client.write('block_dig', {
+                    status: 2, // stop digging
+                    location: block.position,
+                    face: 1
+                });
+            } else {
+                //console.log("The block can be instamined always",breakingTime);
+                this.bot._client.write('block_dig', {
+                    status: 0, // start digging
+                    location: block.position,
+                    face: 1
+                });
+            }
+        }
+        this.nukerPacketCount += (this.bot.digTime(block) > 50) ? 3 : 1
     }
-    
+
     canMine(block) {
+        if (this.config.miningMode !== "packet") return true;
         const packetCount = (this.bot.digTime(block) > 50) ? 3 : 1;
-        return !(this.nukerPacketCount >= this.config.nukerPacketLimit || this.nukerPacketCount + packetCount >= this.config.nukerPacketLimit);
+        if (this.structure) { // Clear plot mode
+            const offset = offsetFromWorldBlock(this.boundingBox, block, this.structure);
+            const structBlock = this.structure.blockMatrix[offset.x][offset.y][offset.z];
+            if (structBlock.name === block.name) {
+                return false;
+            }
+        }
+        if (this.blockTimeoutList.length >= this.config.miningBlockBufferSize) return false;
+        if (this.blockTimeoutList.length > 0 && block.position.equals(this.blockTimeoutList[0].block.position)) return false;
+        if (this.nukerPacketCount >= this.config.nukerPacketLimit) return false;
+        if (this.nukerPacketCount + packetCount >= this.config.nukerPacketLimit) return false;
+        for (let blockWithTimeout of this.blockTimeoutList) {
+            if (block.position.equals(blockWithTimeout.block.position)) return false;
+        }
+        return true;
+
     }
+
     async breakBlock(block){
+        while (this.stop) sleep(100);
         this.bot.emit("breakBlock", {'block': block, 'breaking': true});
-        switch (this.config.mode) {
+        switch (this.config.miningMode) {
             case "packet":
-                await this._breakWithPacket(block);
+                await this.equipBestTool(block);
+                await sleep(1);
+                if (!this.canMine(block)) break;
+                this._breakWithPacket(block);
+                //await sleep(100);
                 break;
             default:
+                this.bot.yawSpeed = 1000;
+                this.bot.pitchSpeed = 1000;
+                await this.equipBestTool(block);
                 await this.bot.dig(block);
                 break;
         }
         this.bot.emit("breakBlock", {'block': block, 'breaking': false});
     }
-    
-    async nukeInRange(){
+
+    getBlocksInRange() { // Doesn't work, sometimes takes air blocks and believes they're another thing.
         let botPos = this.bot.entity.position;
+        let blockList = [];
         botPos = new Vec3(Math.floor(botPos.x), Math.floor(botPos.y), Math.floor(botPos.z));
-        while (true) {
-            let blockFound = false;
-            for (let z = botPos.z - this.config.range; z <= botPos.z + this.config.range; z++) {
-                for (let x = botPos.x - this.config.range; x <= botPos.x + this.config.range; x++) {
-                    for (let y = botPos.y; y <= botPos.y + this.config.range; y++) {
-                        const block = this.bot.world.getBlock(new Vec3(x, y, z));
-                        if (botPos.distanceTo(block.position) <= this.config.range) {
-                            if (this.config.includes.includes(block.name) && isInside(block, this.boundingBox) && block.name !== 'air') {
-                                if (this.canMine(block) && block.material) {
-                                    await this.breakBlock(block);
-                                } else {
-                                    this.nukerPacketCount--;
-                                    await sleep(this.config.cooldown);
-                                }
-                                blockFound = true;
-                            }
+        for (let z = botPos.z - this.config.range; z <= botPos.z + this.config.range; z++) {
+            for (let x = botPos.x - this.config.range; x <= botPos.x + this.config.range; x++) {
+                for (let y = botPos.y; y <= botPos.y + this.config.range; y++) {
+                    const block = this.bot.world.getBlock(new Vec3(x, y, z));
+                    if (botPos.distanceTo(block.position) <= this.config.range) {
+                        const blockMode = (this.config.blockMode === "includes" && this.config.includes.includes(block.name)) ||
+                            (this.config.blockMode === "excludes" && !this.config.excludes.includes(block.name));
+                        if (blockMode && isInside(block, this.boundingBox) && block.name !== 'air') { //blockmode
+                            blockList.push(block);
                         }
                     }
                 }
             }
-            if (!blockFound) {
-                break;
+        }
+        return blockList;
+    }
+
+    sortBlocks(blockList) {
+        return blockList.sort((a, b) => a.material.localeCompare(b.material));
+    }
+
+    updateMiningBlocks() {
+        this.blockTimeoutList = this.blockTimeoutList.filter(blockWithTimeout => { // Blocks which aren't breaking or have the same blockstate (same type of block) are filtered out.
+            const date = Date.now();
+            const isBreaking = blockWithTimeout.timeout + this.config.blockTimeoutDelay + blockWithTimeout.ttm <= date ; // TODO FAILS THE COMPARISON
+            const isSameState = this.bot.world.getBlock(blockWithTimeout.block.position).name === blockWithTimeout.block.name;
+            return isBreaking && isSameState;
+        });
+    }
+    async nukeInRange() {
+        while (true) {
+            while (this.stop) sleep(100);
+            const blocks = this.sortBlocks(this.getBlocksInRange()); // TODO WORKS
+            let foundMineableBlock = false;
+            if (blocks.length === 0 && this.blockTimeoutList.length === 0) return;
+            if (this.config.miningMode === "packet") { // This is empty the first iteration, the following ones can have multiple blockTimeouts
+                this.updateMiningBlocks();
+                this.nukerPacketCount = 0;
+            }
+            for (let block of blocks) {
+                await this.breakBlock(block); // TODO DOESN'T WORK
             }
         }
     }
 
-    nearestNukerBlock() {
-        if (this.abort) {
-            if (this.abort.signal.aborted) return null;
-        }
+    nearestNukerBlock() { // TODO WORKS
+        const filter = this.config.blockMode === "includes" ? this.config.includes : this.config.excludes;
         switch (this.config.searchMode) {
             case "scanner":
-                return scanner(this.bot, this.config.includes, this.boundingBox);
+                return scanner(this.bot, this.config.blockMode, filter, this.boundingBox); // TODO change
                 break;
             case "spiral":
-                return spiral(this.bot, this.config.includes, this.boundingBox);
+                return spiral(this.bot, this.config.blockMode, filter, this.boundingBox);
                 break;
             default:
-                return spiral(this.bot, this.config.includes, this.boundingBox);
+                return spiral(this.bot, this.config.blockMode, filter, this.boundingBox);
                 break;
         }
     }
 
     async nukeArea(){
-        this.bot.emit("nuker", true);
+        this.bot.emit("nukeArea", { nuker: this, nuking: true });
         let nnb = this.nearestNukerBlock();
         while (nnb) {
-            await sleep(1);
+            while (this.stop) sleep(100);
             const playerPos = this.bot.entity.position.floored();
             const nnbPos = nnb.position;
             if (nnbPos.distanceTo(playerPos) > this.config.range) {
@@ -215,31 +306,25 @@ class Nuker {
             await this.nukeInRange();
             nnb = this.nearestNukerBlock();
         }
-        this.bot.emit("nuker", false);
+        this.bot.emit("nukeArea", { nuker: this, nuking: false });
         console.log("Done nuking area...");
+    }
+
+    async activate() {
+        await this.nukeArea();
     }
 }
 
+/*
 function createNuker(priorityQueue, bot, priority = 6) {
     let abortController = new AbortController();
     const nukerObj = new Nuker(bot, abortController);
     const nukerEvent = new PriorityEvent("Nuker", () => nukerObj.nukeArea(), priority, EventStatus.PENDING, abortController);
     priorityQueue.enqueue(nukerEvent);
 }
-
-module.exports = { Nuker, createNuker };
-
-/*
-function nuker(bot, range = 4, excludes = [], boundingBox = [new Vec3(-64, -60, 64), new Vec3(-64 + 128, -58, 64 + 128)], options = { nukerPacketLimit: 10, mode: 'packet' }, priority = 3) {
-    const event = {
-        name: 'nuker',
-        action: async () => await nukeArea(bot, range, excludes, boundingBox, options),
-        priority: priority,
-        abortController: new AbortController(),
-        status: EventStatus.PENDING
-    };
-    bot.eventEmitter.pushEvent(event);
-}
  */
+
+module.exports = { Nuker };
+
 
 

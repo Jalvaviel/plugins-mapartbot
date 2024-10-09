@@ -1,4 +1,4 @@
-const { getEmptyBlockMatrix } = require("../../utils/structureUtils");
+const { getEmptyBlockMatrix } = require("./VerifyStructure");
 const Vec3 = require("vec3")
 
 class WorldStructure {

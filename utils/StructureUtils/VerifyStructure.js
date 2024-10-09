@@ -1,6 +1,9 @@
-const { getEmptyBlockMatrix, sortKeysByValues } = require("../../utils/structureUtils");
 const Structure = require("./Structure.js")
 const {Vec3} = require("vec3");
+const {readFileSync} = require("fs");
+const nbt = require('prismarine-nbt');
+const registry = require("prismarine-registry")('1.20');
+const Block = require("prismarine-block")(registry);
 
 /**
  * Verifies if the two StructureUtils are equal. Returns a new Structure of the missing blocks. The new Structure is assembled with a builder pattern.
@@ -58,4 +61,42 @@ function offsetFromWorldBlock(boundingBox, worldBlock, currentStructure) {
     return new Vec3(offsetX,offsetY,offsetZ);
 }
 
-module.exports = { verifyStructure, getMissingMats, offsetFromWorldBlock };
+function getEmptyBlockMatrix(size) {
+    const air = Block.fromString('air', 0)
+    const width = size.x
+    const height = size.y
+    const depth = size.z
+
+    let blockMatrix = new Array(width)
+    for (let x = 0; x < width; x++) {
+        blockMatrix[x] = new Array(height)
+        for (let y = 0; y < height; y++) {
+            blockMatrix[x][y] = new Array(depth).fill(air)
+        }
+    }
+    return blockMatrix
+}
+
+async function parseNbt(filepath = "./schematics/test.nbt") {
+    try {
+        const buffer = readFileSync(filepath)
+        const { parsed } = await nbt.parse(buffer)
+        return parsed
+    } catch (error) {
+        console.error("Error reading or parsing NBT file:", error)
+        throw error;
+    }
+}
+
+function sortKeysByValues(obj) {
+    // Convert the object into an array of key-value pairs
+    const entries = Object.entries(obj);
+
+    // Sort the array based on the values (descending order)
+    entries.sort(([, valueA], [, valueB]) => valueB - valueA);
+
+    // Convert the sorted array back into an object
+    return Object.fromEntries(entries);
+}
+
+module.exports = { verifyStructure, getMissingMats, offsetFromWorldBlock, getEmptyBlockMatrix, parseNbt, sortKeysByValues };

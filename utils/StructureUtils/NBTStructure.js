@@ -1,7 +1,7 @@
 const registry = require("prismarine-registry")('1.20');
 const Block = require("prismarine-block")(registry);
 const Vec3 = require("vec3");
-const { getEmptyBlockMatrix } = require("../../utils/structureUtils");
+const { getEmptyBlockMatrix } = require("./VerifyStructure");
 
 class NBTStructure {
     palette;

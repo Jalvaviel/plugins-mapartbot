@@ -1,38 +1,47 @@
 const { readFileSync } = require('fs');
 const { sleep } = require("mineflayer/lib/promise_utils");
-const PriorityEvent = require("../../utils/old/PriorityEvent");
-const { EventStatus } = require("../../utils/old/EventStatus");
 
 class AutoEat {
-    constructor(bot, foods = JSON.parse(readFileSync("./AutoEat/foods.json")), config = JSON.parse(readFileSync("./AutoEat/config.json"))) {
+    constructor(bot, foods = JSON.parse(readFileSync("./modules/AutoEat/foods.json")), config = JSON.parse(readFileSync("./modules/AutoEat/config.json"))) {
         this.bot = bot;
         this.foods = foods;
         this.config = config;
     }
+
     async eat(){
-        this.bot.emit('eat', true);
-        for (const item of this.bot.inventory.items()) {
-            if (this.foods.includes(item.name)) {
-                try {
-                    await this.bot.equip(item, this.config.offhand ? 'off-hand' : 'hand'); // Equip food item
-                    this.bot.deactivateItem();  // Deactivate held item
-                    this.bot.activateItem();    // Start eating
+        if (this.bot.food < this.config.threshold) {
+            this.bot.emit('eat', {autoEat: this, eating: true});
+            for (const item of this.bot.inventory.items()) {
+                if (this.foods.includes(item.name)) {
+                    try {
+                        await this.bot.equip(item, this.config.offhand ? 'off-hand' : 'hand'); // Equip food item
+                        this.bot.deactivateItem();  // Deactivate held item
+                        this.bot.activateItem();    // Start eating
 
-                    const initialCount = this.bot.heldItem ? this.bot.heldItem.count : 0;
+                        const initialCount = this.bot.heldItem ? this.bot.heldItem.count : 0;
 
-                    while (this.bot.heldItem && this.bot.heldItem.count === initialCount) {
-                        await sleep(1);
+                        while (this.bot.heldItem && this.bot.heldItem.count === initialCount) {
+                            await sleep(1);
+                        }
+                    } catch (e) {
+                        console.log(`Failed to eat ${item.name}: ${e}`);
                     }
-                } catch (e) {
-                    console.log(`Failed to eat ${item.name}: ${e}`);
+                    break;
                 }
-                break;
             }
+            this.bot.emit('eat', {autoEat: this, eating: false});
         }
-        this.bot.emit('eat', false);
+    }
+
+    activate() {
+        setInterval(() => {
+            this.eat();
+        },this.config.countdown*1000);
     }
 }
 
+
+/*
 function createAutoEat(priorityQueue, bot, priority = 10) {
     const autoEatObj = new AutoEat(bot);
     if (bot.food < autoEatObj.config.threshold) {
@@ -40,8 +49,9 @@ function createAutoEat(priorityQueue, bot, priority = 10) {
         priorityQueue.enqueue(autoEatEvent);
     }
 }
+ */
 
-module.exports = { AutoEat, createAutoEat };
+module.exports = { AutoEat };
 /*
 // Function to handle auto-eating with priority
 function autoEat(this.bot, this.foods, offhand = false, priority = 10) {
