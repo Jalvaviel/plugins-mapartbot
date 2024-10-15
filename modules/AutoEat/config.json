@@ -1,5 +1,5 @@
 {
   "threshold" : 10,
   "offhand" : false,
-  "countdown" : 5
+  "countdown" : 5000
 }

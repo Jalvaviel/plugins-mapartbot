@@ -1,10 +1,9 @@
 {
   "cameraSpeed": 1000,
   "range" : 4,
-  "corner" : "auto",
   "boundingBox" : "auto",
   "mode" : "airplace",
+  "blockMode" : "includes",
   "searchMode" : "spiral",
-  "noobline" : true,
-  "cooldown": 0
+  "structureFolder" : "./maparts"
 }

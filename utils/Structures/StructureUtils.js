@@ -1,42 +1,8 @@
-const Structure = require("./Structure.js")
 const {Vec3} = require("vec3");
 const {readFileSync} = require("fs");
 const nbt = require('prismarine-nbt');
 const registry = require("prismarine-registry")('1.20');
 const Block = require("prismarine-block")(registry);
-
-/**
- * Verifies if the two StructureUtils are equal. Returns a new Structure of the missing blocks. The new Structure is assembled with a builder pattern.
- * @param structure1 A StructureUtils from an NBT.
- * @param structure2 A StructureUtils from the world.
- * @returns Structure | null
- */
-function verifyStructure(structure1,structure2) { // TODO Add mode build/clear
-    if (!structure1.size.equals(structure2.size)) return null; // Detect if they're the same size, if not return a null
-    let palette = [];
-    let materialList = {};
-    //structure1.logStructureData();
-    //structure2.logStructureData();
-    let bMatrix = getEmptyBlockMatrix(structure1.size);
-    for(let x = 0; x < structure1.size.x; x++) {
-        for(let y = 0; y < structure1.size.y; y++) {
-            for (let z = 0; z < structure1.size.z; z++) {
-                if (structure1.blockMatrix[x][y][z].name !== structure2.blockMatrix[x][y][z].name) { // If the block names are not equal, put it in the new blockMatrix
-                    bMatrix[x][y][z] = structure1.blockMatrix[x][y][z]; // Assign to the new StructureUtils the nbt StructureUtils' block
-                    if (!palette.includes(bMatrix[x][y][z].name)){ // If there's no mat in the palette for that block: i.e. "stone", put it and set the matCount to 1
-                        palette.push(bMatrix[x][y][z].name);
-                        materialList[bMatrix[x][y][z].name] = 1;
-                    } else { // If there's already one instance of the mat in the palette, means that it at least has 1 mat in the materialList of that type, so we add 1
-                        materialList[bMatrix[x][y][z].name] += 1;
-                    }
-                }
-            }
-        }
-    }
-    materialList = sortKeysByValues(materialList); // Sort the mats by quantity
-    //delete materialList['air']; // Remove the air from the list, it's handled later
-    return new Structure(palette, structure1.size, bMatrix, materialList);
-}
 
 function getMissingMats(materialList1,materialList2) { // The currentStructure vs worldStructure
     const result = {};
@@ -99,4 +65,4 @@ function sortKeysByValues(obj) {
     return Object.fromEntries(entries);
 }
 
-module.exports = { verifyStructure, getMissingMats, offsetFromWorldBlock, getEmptyBlockMatrix, parseNbt, sortKeysByValues };
+module.exports = { getMissingMats, offsetFromWorldBlock, getEmptyBlockMatrix, parseNbt, sortKeysByValues };

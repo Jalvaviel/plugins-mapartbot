@@ -2,6 +2,7 @@ const mineflayer = require('mineflayer');
 const { pathfinder } = require('mineflayer-pathfinder');
 const { Movements } = require('mineflayer-pathfinder');
 const {Nuker}  = require('./modules/Nuker/nuker');
+const {Builder}  = require('./modules/Builder/builder');
 const {AutoEat} = require("./modules/AutoEat/autoEat");
 const {InventoryManager} = require("./utils/InventoryManager/inventoryManager");
 const AntiBreak = require("./modules/AntiBreak/antiBreak");
@@ -16,7 +17,7 @@ let startMinecraftBot = (host, port, username) => {
 }
 
 // Create the bot
-let bot = startMinecraftBot("0.0.0.0", 25567, 'jalvabot@outlook.es');
+let bot = startMinecraftBot("0.0.0.0", 25566, 'jalvabot@outlook.es');
 bot.loadPlugin(pathfinder);
 
 let pathfinderMovements = () => {
@@ -60,5 +61,9 @@ bot.on("chat", async (username, message) => {
     if (message === '!ab'){
         let antiBreak = new AntiBreak(bot);
         await antiBreak.dumpAndPickup();
+    }
+    if (message === '!build'){
+        let builder = new Builder(bot);
+        await builder.activate();
     }
 });

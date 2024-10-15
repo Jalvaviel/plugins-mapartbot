@@ -1,7 +1,7 @@
 const registry = require("prismarine-registry")('1.20');
 const Block = require("prismarine-block")(registry);
 const Vec3 = require("vec3");
-const { getEmptyBlockMatrix } = require("./VerifyStructure");
+const {getEmptyBlockMatrix} = require("./StructureUtils");
 
 class NBTStructure {
     palette;
@@ -9,10 +9,10 @@ class NBTStructure {
     size;
     blockMatrix;
 
-    constructor(nbt, corner) {
+    constructor(nbt, bbox) {
         this.getPalette(nbt);
         this.getSize(nbt);
-        this.getBlockMatrix(nbt, this.size, this.palette, corner);
+        this.getBlockMatrix(nbt, this.size, this.palette, bbox);
     }
 
     getPalette(nbt) {
@@ -32,7 +32,7 @@ class NBTStructure {
         );
     }
 
-    getBlockMatrix(nbt, size, palette, corner) {
+    getBlockMatrix(nbt, size, palette, bbox) {
         let blockMatrix = getEmptyBlockMatrix(size);
 
         // Fill the blockMatrix
@@ -43,7 +43,7 @@ class NBTStructure {
             const z = nbtBlock.pos.value.value[2]; // -1 to remove the anti noobline
             const blockString = palette[nbtBlock.state.value].replace(/^minecraft:/, '');
             let block = Block.fromString(blockString, 0);
-            block.position = new Vec3(corner.x + x, corner.y + y, corner.z + z);
+            block.position = new Vec3(bbox[0].x + x, bbox[0].y + y, bbox[0].z + z);
             blockMatrix[x][y][z] = block;
 
             this.materialList[blockString] += 1;

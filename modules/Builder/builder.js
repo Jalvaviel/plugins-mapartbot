@@ -1,35 +1,83 @@
 const {readdirSync, readFileSync} = require("fs");
 const InventoryManager = require("../../utils/InventoryManager/inventoryManager");
 const {Nuker} = require("../Nuker/nuker");
-const Structure = require("../../utils/StructureUtils/Structure");
+const Structure = require("../../utils/Structures/Structure");
 const {boundingBox, isInside} = require("../../utils/BlockUtils/boundingBox");
 const {Vec3} = require("vec3");
 const {scanner, spiral} = require("../../utils/BlockFinder/algorithms");
 const {goalWithTimeout} = require("../../utils/BlockFinder/goalWithTimeout");
 const { sleep } = require("mineflayer/lib/promise_utils");
-const {getMissingMats} = require("../../utils/StructureUtils/VerifyStructure");
+const {getMissingMats, parseNbt} = require("../../utils/Structures/StructureUtils");
+const {depositItems} = require("../../utils/BlockFinder/storage");
+const {resolve} = require("path");
 
 class Builder {
-    constructor(bot, abort = null, config = JSON.parse(readFileSync('./Builder/options.json')), inventoryManager = new InventoryManager(this.bot), nuker = new Nuker(this.bot), structureFolder = readdirSync('./Maparts').filter(file => file.endsWith('.nbt'))) {
+    constructor(bot, config = JSON.parse(readFileSync('./modules/Builder/config.json'))) {
         this.bot = bot;
         this.config = config;
-        this.inventoryManager = inventoryManager;
-        this.nuker = nuker;
-        this.structureFolder = structureFolder;
-        this.boundingBox = (this.config.boundingBox === "auto") ? boundingBox(this.bot.entity.position) : [new Vec3(this.config.boundingBox[0],this.config.boundingBox[1],this.config.boundingBox[2]), new Vec3(this.config.boundingBox[3],this.config.boundingBox[4],this.config.boundingBox[5])];
-        this.abort = abort;
+        this.boundingBox = this.config.boundingBox === "auto"
+            ? boundingBox(this.bot.entity.position)
+            : [new Vec3(...this.config.boundingBox.slice(0, 3)), new Vec3(...this.config.boundingBox.slice(3, 6))];
+
+        this.inventoryManager = new InventoryManager(this.bot);
+        this.nuker = new Nuker(this.bot);
+
+        this.structureFolder = readdirSync(resolve(this.config.structureFolder)).filter(file => file.endsWith('.nbt'));
+        this.materialList = null;
+
+        this.stop = false;
+        this.isActive = false;
+        this.addListeners();
+    }
+
+    addListeners() {
+        this.bot.on('eat', (eatEvent) => {
+            if (this.isActive) {
+                if (eatEvent.eating) {
+                    this.bot.pathfinder.stop();
+                    this.stop = true;
+                } else {
+                    this.stop = false;
+                }
+            }
+        });
+        this.bot.on('depositItems', (depositItemsObj) => {
+            if (this.isActive) {
+                if (depositItemsObj.depositing) {
+                    this.bot.pathfinder.stop();
+                    this.stop = true;
+                } else {
+                    this.stop = false;
+                }
+            }
+        });
+        this.bot.on('withdrawItems', (withdrawItemsObj) => {
+            if (this.isActive) {
+                if (withdrawItemsObj.withdrawing) {
+                    this.bot.pathfinder.stop();
+                    this.stop = true;
+                } else {
+                    this.stop = false;
+                }
+            }
+        });
+    }
+
+    async activate() {
+        this.isActive = true;
+        await this.buildStructures() // TODO
+    }
+    async deactivate() { // TODO take into account when the whole folder of structures is built.
+        this.isActive = false;
     }
 
     nearestBuilderBlock(currentMaterial) {
-        if (this.abort) {
-            if (this.abort.signal.aborted) return null;
-        }
-        switch (this.config.searchMode) {
+        switch (this.config.searchMode) { // TODO RETURNS NULL
             case "scanner":
                 return scanner(this.bot, currentMaterial, this.boundingBox);
                 break;
             case "spiral":
-                return spiral(this.bot, currentMaterial, this.boundingBox);
+                return spiral(this.bot, this.config.blockMode, currentMaterial, this.boundingBox);
                 break;
             default:
                 return spiral(this.bot, currentMaterial, this.boundingBox);
@@ -100,11 +148,9 @@ class Builder {
         //this.worldStructure = worldStructure;
         this.materialList = getMissingMats(currentStructure.materialList,worldStructure.materialList);
         for (let material of Object.keys(this.materialList)) {
-            if (this.abort) {
-                if (this.abort.signal.aborted) return null;
-            }
             let nbb = this.nearestBuilderBlock(material);
             while (nbb) {
+                if (this.stop) return;
                 await this.checkAndRefillMat(material);
                 await sleep(1);
                 const playerPos = this.bot.entity.position.floored();
@@ -118,13 +164,17 @@ class Builder {
         }
         this.bot.emit("buildStructure", {'structure': currentStructure, 'building': false });
     }
-    async buildStructures(){ // TODO take into account the event system.
+
+    async buildStructures(){ // TODO Add an atribute to keep track of built structures
         for (let structureFile of this.structureFolder) {
-            const structureNBT = JSON.parse(readFileSync(structureFile));
-            const structure = new Structure.FromNBT(structureNBT, this.boundingBox[0]);
+            const structureNBT = await parseNbt(this.config.structureFolder+"/"+structureFile);
+            const currentStructure = await Structure.FromNBT(structureNBT, this.boundingBox);
+            const worldStructure = await Structure.FromWorld(this.bot.world, this.boundingBox);
             //await this.nuker.nukeArea(); // Nuke first TODO mine only strictly necessary blocks
-            await this.buildStructure(structure); // Build next
+            await this.buildStructure(currentStructure, worldStructure); // Build next
             //await this.mapStructure(structure); // Use a map, fix it, and deposit it
         }
     }
 }
+
+module.exports = { Builder }

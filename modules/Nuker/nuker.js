@@ -4,7 +4,7 @@ const { scanner, spiral } = require('../../utils/BlockFinder/algorithms');
 const { goalWithTimeout } = require("../../utils/BlockFinder/goalWithTimeout");
 const { readFileSync} = require("fs");
 const { boundingBox, isInside } = require("../../utils/BlockUtils/boundingBox");
-const { offsetFromWorldBlock } = require("../../utils/StructureUtils/VerifyStructure");
+const { offsetFromWorldBlock } = require("../../utils/Structures/StructureUtils");
 
 class Nuker {
     constructor(bot, structure = null, config = JSON.parse(readFileSync("./modules/Nuker/config.json"))) {
@@ -15,28 +15,34 @@ class Nuker {
             ? boundingBox(this.bot.entity.position)
             : [new Vec3(...this.config.boundingBox.slice(0, 3)), new Vec3(...this.config.boundingBox.slice(3, 6))];
         this.structure = structure;
-        //this.miningBlocks = [];
         this.blockTimeoutList = [];
+        this.isActive = false;
         this.stop = false;
         this.addListeners();
     }
 
     addListeners() {
-        this.bot.on('eat', (eatEvent) => {
-            if (eatEvent.eating) {
-                this.stop = true;
-                this.bot.pathfinder.stop();
-            } else {
-                this.stop = false;
+        this.bot.on('eat', async (eatEvent) => {
+            if (this.isActive) {
+                if (eatEvent.eating) {
+                    this.stop = true;
+                    this.bot.pathfinder.stop();
+                } else {
+                    this.stop = false;
+                    await this.activate();
+                }
             }
         });
 
-        this.bot.on('replenishTools', (replenishEvent) => {
-            if (replenishEvent.replenishing) {
-                this.stop = true;
-                this.bot.pathfinder.stop();
-            } else {
-                this.stop = false;
+        this.bot.on('replenishTools', async (replenishEvent) => {
+            if (this.isActive) {
+                if (replenishEvent.replenishing) {
+                    this.stop = true;
+                    this.bot.pathfinder.stop();
+                } else {
+                    this.stop = false;
+                    await this.activate();
+                }
             }
         });
     }
@@ -178,7 +184,7 @@ class Nuker {
             } else {
                 //console.log("The block can be instamined always",breakingTime);
                 this.bot._client.write('block_dig', {
-                    status: 0, // start digging
+                    status: 2, // start digging
                     location: block.position,
                     face: 1
                 });
@@ -209,7 +215,7 @@ class Nuker {
     }
 
     async breakBlock(block){
-        while (this.stop) sleep(100);
+        if (this.stop) return;
         this.bot.emit("breakBlock", {'block': block, 'breaking': true});
         switch (this.config.miningMode) {
             case "packet":
@@ -220,10 +226,10 @@ class Nuker {
                 //await sleep(100);
                 break;
             default:
-                this.bot.yawSpeed = 1000;
-                this.bot.pitchSpeed = 1000;
+                this.bot.physics.yawSpeed = 1000;
+                this.bot.physics.pitchSpeed = 1000;
                 await this.equipBestTool(block);
-                await this.bot.dig(block);
+                try {await this.bot.dig(block);} catch (e) {}
                 break;
         }
         this.bot.emit("breakBlock", {'block': block, 'breaking': false});
@@ -257,15 +263,16 @@ class Nuker {
     updateMiningBlocks() {
         this.blockTimeoutList = this.blockTimeoutList.filter(blockWithTimeout => { // Blocks which aren't breaking or have the same blockstate (same type of block) are filtered out.
             const date = Date.now();
-            const isBreaking = blockWithTimeout.timeout + this.config.blockTimeoutDelay + blockWithTimeout.ttm <= date ; // TODO FAILS THE COMPARISON
+            const isBreaking = blockWithTimeout.timeout + this.config.blockTimeoutDelay + blockWithTimeout.ttm <= date ;
             const isSameState = this.bot.world.getBlock(blockWithTimeout.block.position).name === blockWithTimeout.block.name;
             return isBreaking && isSameState;
         });
     }
     async nukeInRange() {
         while (true) {
-            while (this.stop) sleep(100);
-            const blocks = this.sortBlocks(this.getBlocksInRange()); // TODO WORKS
+            //while (this.stop) sleep(100);
+            if (this.stop) return;
+            const blocks = this.sortBlocks(this.getBlocksInRange());
             let foundMineableBlock = false;
             if (blocks.length === 0 && this.blockTimeoutList.length === 0) return;
             if (this.config.miningMode === "packet") { // This is empty the first iteration, the following ones can have multiple blockTimeouts
@@ -273,7 +280,7 @@ class Nuker {
                 this.nukerPacketCount = 0;
             }
             for (let block of blocks) {
-                await this.breakBlock(block); // TODO DOESN'T WORK
+                await this.breakBlock(block);
             }
         }
     }
@@ -297,7 +304,8 @@ class Nuker {
         this.bot.emit("nukeArea", { nuker: this, nuking: true });
         let nnb = this.nearestNukerBlock();
         while (nnb) {
-            while (this.stop) sleep(100);
+            //while (this.stop) sleep(100);
+            if (this.stop) return;
             const playerPos = this.bot.entity.position.floored();
             const nnbPos = nnb.position;
             if (nnbPos.distanceTo(playerPos) > this.config.range) {
@@ -311,18 +319,13 @@ class Nuker {
     }
 
     async activate() {
+        this.isActive = true;
         await this.nukeArea();
     }
+    async deactivate() {
+        this.isActive = false;
+    }
 }
-
-/*
-function createNuker(priorityQueue, bot, priority = 6) {
-    let abortController = new AbortController();
-    const nukerObj = new Nuker(bot, abortController);
-    const nukerEvent = new PriorityEvent("Nuker", () => nukerObj.nukeArea(), priority, EventStatus.PENDING, abortController);
-    priorityQueue.enqueue(nukerEvent);
-}
- */
 
 module.exports = { Nuker };
 

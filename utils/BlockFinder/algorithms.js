@@ -152,7 +152,7 @@ function spiral(bot, blockMode, blockList, boundingBox) {
         const block = bot.world.getBlock(currentVector);
         const mode = (blockMode === "includes" && blockList.includes(block.name)) ||
             (blockMode === "excludes" && !blockList.includes(block.name));
-        if (block.name !== 'air' && isInside(block, boundingBox)) { // mode
+        if (mode && block.name !== 'air' && isInside(block, boundingBox)) { // mode
             return block;
         }
 

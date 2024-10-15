@@ -7,16 +7,19 @@ class AntiBreak {
         this.config = config;
         this.inventoryManager = new InventoryManager(bot);
         this.stop = false;
+        this.isActive = false;
         this.addListeners();
     }
 
     addListeners() {
         this.bot.on('eat', (eatEvent) => {
-            if (eatEvent.eating) {
-                this.bot.pathfinder.stop();
-                this.stop = true;
-            } else {
-                this.stop = false;
+            if (this.isActive) {
+                if (eatEvent.eating) {
+                    this.bot.pathfinder.stop();
+                    this.stop = true;
+                } else {
+                    this.stop = false;
+                }
             }
         });
     }
@@ -43,9 +46,15 @@ class AntiBreak {
     }
 
     activate() {
-        setInterval(() => {
-            this.replenishTools();
-        },this.config.countdown*1000);
+        this.isActive = true;
+        this.antiBreakInterval = setInterval(async () => {
+            await this.replenishTools();
+        },this.config.countdown);
+    }
+
+    deactivate() {
+        this.isActive = false;
+        clearInterval(this.antiBreakInterval);
     }
 
 }

@@ -83,7 +83,7 @@ class InventoryManager {
         const sorterChest = this.config.hasSorter ? await this.storageSystem.getMaterialChest(this.config.sorterBlock)
             : await this.storageSystem.getMaterialChest(material);
         if (!sorterChest) return null;
-        const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang got rid of them 10 years ago.
+        const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
         await goalWithTimeout(this.bot, sorterChest.position);
         const sorterChestInventory = await this.bot.openContainer(sorterChest);
         try {
@@ -103,7 +103,7 @@ class InventoryManager {
         const sorterChest = await this.storageSystem.getMaterialChest(material);
         if (!sorterChest) return null;
         quantity = quantity > this.config.maxWithdraw ? this.config.maxWithdraw : quantity;
-        const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang got rid of them 10 years ago.
+        const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
         await goalWithTimeout(this.bot, sorterChest.position);
         const sorterChestInventory = await this.bot.openContainer(sorterChest);
         try {
