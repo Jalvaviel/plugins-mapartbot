@@ -5,25 +5,27 @@ const Structure = require("../../utils/Structures/Structure");
 const {boundingBox, isInside} = require("../../utils/BlockUtils/boundingBox");
 const {Vec3} = require("vec3");
 const {scanner, spiral} = require("../../utils/BlockFinder/algorithms");
-const {goalWithTimeout} = require("../../utils/BlockFinder/goalWithTimeout");
+const {goalWithDelta, goalWithTimeout} = require("../../utils/BlockFinder/goalWithTimeout");
 const { sleep } = require("mineflayer/lib/promise_utils");
 const {getMissingMats, parseNbt} = require("../../utils/Structures/StructureUtils");
-const {depositItems} = require("../../utils/BlockFinder/storage");
 const {resolve} = require("path");
 
 class Builder {
-    constructor(bot, config = JSON.parse(readFileSync('./modules/Builder/config.json'))) {
+    constructor(bot, nuker = null, config = JSON.parse(readFileSync('./modules/Builder/config.json'))) {
         this.bot = bot;
         this.config = config;
         this.boundingBox = this.config.boundingBox === "auto"
             ? boundingBox(this.bot.entity.position)
             : [new Vec3(...this.config.boundingBox.slice(0, 3)), new Vec3(...this.config.boundingBox.slice(3, 6))];
-
         this.inventoryManager = new InventoryManager(this.bot);
-        this.nuker = new Nuker(this.bot);
+        this.nuker = nuker;
 
         this.structureFolder = readdirSync(resolve(this.config.structureFolder)).filter(file => file.endsWith('.nbt'));
         this.materialList = null;
+        this.lastBlock = null;
+
+        this.bot.physics.yawSpeed = 1000;
+        this.bot.physics.pitchSpeed = 1000;
 
         this.stop = false;
         this.isActive = false;
@@ -31,39 +33,49 @@ class Builder {
     }
 
     addListeners() {
-        this.bot.on('eat', (eatEvent) => {
+        this.bot.on('eat', async (eatEvent) => {
             if (this.isActive) {
                 if (eatEvent.eating) {
-                    this.bot.pathfinder.stop();
+                    //console.log("eating")
                     this.stop = true;
+                    try {this.bot.pathfinder.stop()} catch (e) {}
                 } else {
                     this.stop = false;
+                    await this.activate();
                 }
             }
         });
-        this.bot.on('depositItems', (depositItemsObj) => {
+
+        this.bot.on('depositItems', async (depositItemsObj) => {
             if (this.isActive) {
                 if (depositItemsObj.depositing) {
-                    this.bot.pathfinder.stop();
+                    console.log(depositItemsObj)
+                    //this.bot.pathfinder.stop();
                     this.stop = true;
                 } else {
                     this.stop = false;
+                    //await this.activate();
                 }
             }
         });
-        this.bot.on('withdrawItems', (withdrawItemsObj) => {
+        this.bot.on('withdrawItems', async (withdrawItemsObj) => {
             if (this.isActive) {
                 if (withdrawItemsObj.withdrawing) {
-                    this.bot.pathfinder.stop();
+                    console.log(withdrawItemsObj)
+                    //this.bot.pathfinder.stop();
                     this.stop = true;
                 } else {
                     this.stop = false;
+                    //await this.activate(); // TODO PROBLEM HERE HANDLED ON CHECKANDREFILLMAT METHOD
                 }
             }
         });
+
     }
 
     async activate() {
+        this.bot.yawSpeed = this.config.cameraSpeed;
+        this.bot.pitchSpeed = this.config.cameraSpeed;
         this.isActive = true;
         await this.buildStructures() // TODO
     }
@@ -71,13 +83,13 @@ class Builder {
         this.isActive = false;
     }
 
-    nearestBuilderBlock(currentMaterial) {
+    nearestBuilderBlock(currentMaterial, currentStructure) {
         switch (this.config.searchMode) { // TODO RETURNS NULL
             case "scanner":
                 return scanner(this.bot, currentMaterial, this.boundingBox);
                 break;
             case "spiral":
-                return spiral(this.bot, this.config.blockMode, currentMaterial, this.boundingBox);
+                return spiral(this.bot, this.config.blockMode, currentMaterial, this.boundingBox, currentStructure, this.lastBlock);
                 break;
             default:
                 return spiral(this.bot, currentMaterial, this.boundingBox);
@@ -85,17 +97,21 @@ class Builder {
         }
     }
 
-    async placeBlock(block, botPos) { // TODO add more modes
+    async equipAndPlaceBlock(block, botPos) { // TODO add more modes
+        //await this.checkAndRefillMat(block.name);
+        if (this.stop) return;
         this.bot.emit("placeBlock", {'block': block, 'placing': true });
-
+        // Anti Doubles if (this.lastBlock && block.position === this.lastBlock.position) { return } // Anti Doubles
         let mineflayerItem = await this.bot.inventory.findInventoryItem(block.name,null, false);
         await this.bot.equip(mineflayerItem,"hand");
         if (block.position.distanceTo(botPos) < 1.5) {
             this.bot.setControlState('jump',true);
         }
-
+        if (this.stop) return;
         switch (this.config.mode) {
             case "airplace":
+                //console.log("Placing block:",block.name,block.position);
+                //await this.bot.placeBlock(block, new Vec3(0,1,0), {swingArm: 'right'})
                 await this.bot._genericPlace(block, new Vec3(0,1,0), {swingArm: 'right'}); // We have to use genericPlace because the original public method is constantly raising false errors.
                 break;
             default:
@@ -103,36 +119,14 @@ class Builder {
                 break;
         }
         this.bot.setControlState('jump',false);
+        this.lastBlock = block;
+        //await sleep(40);
 
         this.bot.emit("placeBlock", {'block': block, 'placing': false });
     }
-    /*
-    async buildInRange(){
-        if (!this.bot.inventory.items().map(item => item.name).includes(block.name)) { // Ran out of mats.
-            return null;
-        }
-        let botPos = this.bot.entity.position;
-        botPos = new Vec3(Math.floor(botPos.x), Math.floor(botPos.y), Math.floor(botPos.z));
-        while (true) {
-            let blockFound = false;
-            for (let z = botPos.z - this.config.range; z <= botPos.z + this.config.range; z++) {
-                for (let x = botPos.x - this.config.range; x <= botPos.x + this.config.range; x++) {
-                    for (let y = botPos.y; y <= botPos.y + this.config.range; y++) {
-                        const block = this.bot.world.getBlock(new Vec3(x, y, z));
-                        if (botPos.distanceTo(block.position) <= this.config.range && block.name === 'air') {
-                            await this.placeBlock(this.currentStructure.blockMatrix[x][y][z], botPos); // TODO
-                            blockFound = true;
-                        }
-                    }
-                }
-            }
-            if (!blockFound) {
-                break;
-            }
-        }
-    }
-     */
+
     async checkAndRefillMat(material) {
+        if (this.stop) return;
         let mineflayerItem = await this.bot.inventory.findInventoryItem(material, null, false);
         if (!mineflayerItem) {
             const [mat, quant] = await this.inventoryManager.withdrawItems(material, this.materialList[material]);
@@ -142,35 +136,35 @@ class Builder {
 
     async buildStructure(currentStructure, worldStructure) { // TODO take into account the event system.
         this.bot.emit("buildStructure", {'structure': currentStructure, 'building': true });
-        this.bot.yawSpeed = this.config.cameraSpeed;
-        this.bot.pitchSpeed = this.config.cameraSpeed;
         //this.currentStructure = currentStructure;
         //this.worldStructure = worldStructure;
-        this.materialList = getMissingMats(currentStructure.materialList,worldStructure.materialList);
+        if (!this.materialList) { // In case another event occurs
+            this.materialList = getMissingMats(currentStructure.materialList,worldStructure.materialList);
+        }
         for (let material of Object.keys(this.materialList)) {
-            let nbb = this.nearestBuilderBlock(material);
+            let nbb = this.nearestBuilderBlock(material, currentStructure);
             while (nbb) {
                 if (this.stop) return;
                 await this.checkAndRefillMat(material);
-                await sleep(1);
                 const playerPos = this.bot.entity.position.floored();
                 const nbbPos = nbb.position;
                 if (nbbPos.distanceTo(playerPos) > this.config.range) {
-                    await goalWithTimeout(this.bot,nbbPos)
+                    await goalWithDelta(this.bot,nbbPos,3);
                 }
-                await this.placeBlock(nbb, playerPos);
-                nbb = this.nearestBuilderBlock(material);
+                await this.equipAndPlaceBlock(nbb, playerPos);
+                nbb = this.nearestBuilderBlock(material, currentStructure);
             }
+            delete this.materialList[material];
         }
         this.bot.emit("buildStructure", {'structure': currentStructure, 'building': false });
     }
 
-    async buildStructures(){ // TODO Add an atribute to keep track of built structures
+    async buildStructures(){ // TODO Add an attribute to keep track of built structures
         for (let structureFile of this.structureFolder) {
             const structureNBT = await parseNbt(this.config.structureFolder+"/"+structureFile);
             const currentStructure = await Structure.FromNBT(structureNBT, this.boundingBox);
             const worldStructure = await Structure.FromWorld(this.bot.world, this.boundingBox);
-            //await this.nuker.nukeArea(); // Nuke first TODO mine only strictly necessary blocks
+            //await this.nuker.activate() // Nuke first TODO mine only strictly necessary blocks
             await this.buildStructure(currentStructure, worldStructure); // Build next
             //await this.mapStructure(structure); // Use a map, fix it, and deposit it
         }
@@ -178,3 +172,21 @@ class Builder {
 }
 
 module.exports = { Builder }
+
+/*
+--------------Debug--------------
+
+C:\Users\Usuario\Desktop\plugins-mapartbot\utils\Structures\StructureUtils.js:28
+    return structure.blockMatrix[offsetX][offsetY][offsetZ];
+                                                  ^
+
+TypeError: Cannot read properties of undefined (reading '105')
+    at offsetFromWorldBlock (C:\Users\Usuario\Desktop\plugins-mapartbot\utils\Structures\StructureUtils.js:28:51)
+    at spiral (C:\Users\Usuario\Desktop\plugins-mapartbot\utils\BlockFinder\algorithms.js:161:33)
+    at Builder.nearestBuilderBlock (C:\Users\Usuario\Desktop\plugins-mapartbot\modules\Builder\builder.js:90:24)
+    at Builder.buildStructure (C:\Users\Usuario\Desktop\plugins-mapartbot\modules\Builder\builder.js:151:28)
+    at async Builder.buildStructures (C:\Users\Usuario\Desktop\plugins-mapartbot\modules\Builder\builder.js:164:13)
+    at async Builder.activate (C:\Users\Usuario\Desktop\plugins-mapartbot\modules\Builder\builder.js:78:9)
+    at async EventEmitter.<anonymous> (C:\Users\Usuario\Desktop\plugins-mapartbot\modules\Builder\builder.js:44:21)
+
+ */

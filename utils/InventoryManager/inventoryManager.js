@@ -1,8 +1,9 @@
 const {readFileSync} = require("fs");
 const  {boundingBox} = require("../BlockUtils/boundingBox");
 const  {Vec3} = require("vec3");
-const  {goalWithTimeout} = require("../BlockFinder/goalWithTimeout");
+const  {goalWithDelta} = require("../BlockFinder/goalWithTimeout");
 const stringToId = require("../stringToId");
+const { sleep } = require("mineflayer/lib/promise_utils");
 
 class StorageSystem {
     constructor(world, boundingBox, size, materials = JSON.parse(readFileSync("./utils/InventoryManager/materials.json"))){
@@ -84,16 +85,17 @@ class InventoryManager {
             : await this.storageSystem.getMaterialChest(material);
         if (!sorterChest) return null;
         const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
-        await goalWithTimeout(this.bot, sorterChest.position);
-        const sorterChestInventory = await this.bot.openContainer(sorterChest);
+        await goalWithDelta(this.bot, sorterChest.position);
         try {
-            //await this.bot.window.deposit(materialId, null, quantity, withNbt);
+            const sorterChestInventory = await this.bot.openContainer(sorterChest);
             await sorterChestInventory.deposit(materialId, null, quantity, withNbt);
+            sorterChestInventory.close();
         } catch (e) {
+            console.log(e)
             // Chest is full.
             // Todo check other fallback chests.
         }
-        sorterChestInventory.close();
+
         this.bot.emit("depositItems", {material: material, quantity: quantity, depositing: false});
         return [material, quantity];
     }
@@ -102,15 +104,24 @@ class InventoryManager {
         this.bot.emit("withdrawItems", {material: material, quantity: quantity, withdrawing: true});
         const sorterChest = await this.storageSystem.getMaterialChest(material);
         if (!sorterChest) return null;
-        quantity = quantity > this.config.maxWithdraw ? this.config.maxWithdraw : quantity;
+        quantity = quantity >= this.config.maxWithdraw ? this.config.maxWithdraw : quantity;
         const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
-        await goalWithTimeout(this.bot, sorterChest.position);
+        await goalWithDelta(this.bot, sorterChest.position);
         const sorterChestInventory = await this.bot.openContainer(sorterChest);
+        /*
+        Uncaught Error: Event windowOpen did not fire within timeout of 20000ms
+        onceWithCleanup	promise_utils.js:62
+        once           	promise_utils.js:76
+        openBlock      	inventory.js:367
+        openContainer  	chest.js:19
+        withdrawItems  	inventoryManager.js:110
+         */
         try {
-            await sorterChestInventory.withdraw(materialId, null, quantity, withNbt);
+            await sorterChestInventory.withdraw(materialId, null, quantity); //withNbt
             //await this.bot.window.withdraw(materialId, null, quantity, withNbt);
         } catch (e) {
-            // Inventory is full.
+            // console.log(e)
+            // Inventory is full. Error: Can't find diorite in slots [0 - 27], (item id: 4)
             // Todo check other fallback chests.
         }
         sorterChestInventory.close();
@@ -121,10 +132,9 @@ class InventoryManager {
         const sorterChest = this.config.hasSorter ? await this.storageSystem.getMaterialChest(this.config.sorterBlock)
             : await this.storageSystem.getMaterialChest(item.name);
         if (!sorterChest) return null;
-        await goalWithTimeout(this.bot, sorterChest.position);
+        await goalWithDelta(this.bot, sorterChest.position);
         const sorterChestInventory = await this.bot.openContainer(sorterChest);
         try {
-
             //await sorterChestInventory.(item, 0, sorterChestInventory.inventoryStart-1, false);
         } catch (e) {
             // Inventory is full.
@@ -183,7 +193,7 @@ Symbol(kCapture) = false
         const sorterChest = this.config.hasSorter ? await this.storageSystem.getMaterialChest(this.config.sorterBlock)
             : await this.storageSystem.getMaterialChest(item.name);
         if (!sorterChest) return null;
-        await goalWithTimeout(this.bot, sorterChest.position);
+        await goalWithDelta(this.bot, sorterChest.position);
         const sorterChestInventory = await this.bot.openContainer(sorterChest);
         try {
             await sorterChestInventory.dumpItem(item, 0, sorterChestInventory.inventoryStart-1, false);

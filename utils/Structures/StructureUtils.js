@@ -17,14 +17,19 @@ function getMissingMats(materialList1,materialList2) { // The currentStructure v
     return sortKeysByValues(result);
 }
 
-function offsetFromWorldBlock(boundingBox, worldBlock, currentStructure) {
+function offsetFromWorldBlock(structure, worldBlock) {
+    const boundingBox = structure.bbox;
     if (!(boundingBox[0].x <= worldBlock.position.x) || !(worldBlock.position.x <= boundingBox[1].x) ||
         !(boundingBox[0].y <= worldBlock.position.y) || !(worldBlock.position.y <= boundingBox[1].y) ||
         !(boundingBox[0].z <= worldBlock.position.z) || !(worldBlock.position.z <= boundingBox[1].z)) return null;
-    const offsetX = worldBlock.x - boundingBox[0].x;
-    const offsetY = worldBlock.y - boundingBox[0].y;
-    const offsetZ = worldBlock.z - boundingBox[0].z;
-    return new Vec3(offsetX,offsetY,offsetZ);
+    const offsetX = worldBlock.position.x - boundingBox[0].x;
+    const offsetY = worldBlock.position.y - boundingBox[0].y;
+    const offsetZ = worldBlock.position.z - boundingBox[0].z;
+    try {
+        return structure.blockMatrix[offsetX][offsetY][offsetZ];
+    } catch (e) {
+        console.log(offsetX,offsetY,offsetZ);
+    }
 }
 
 function getEmptyBlockMatrix(size) {

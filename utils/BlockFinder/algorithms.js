@@ -1,5 +1,6 @@
 const {Vec3} = require("vec3");
 const {isInside} = require("../BlockUtils/boundingBox");
+const {offsetFromWorldBlock} = require("../Structures/StructureUtils");
 
 function dijkstra(bot, excludes, boundingBox) {
     const start = bot.entity.position.floored();
@@ -118,7 +119,7 @@ function customScanner(bot, excludes, boundingBox, exploredPos = {value: []}) {
     }
     return nearestBlock;
 }
-function spiral(bot, blockMode, blockList, boundingBox) {
+function spiral(bot, blockMode, blockList, boundingBox, structure = null, lastBlock = null) {
     blockList = (Array.isArray(blockList)) ? blockList : [blockList];
     const playerPos = bot.entity.position.floored();
     const directions = [
@@ -150,10 +151,25 @@ function spiral(bot, blockMode, blockList, boundingBox) {
     while (true) {
         // Check for block at current position
         const block = bot.world.getBlock(currentVector);
-        const mode = (blockMode === "includes" && blockList.includes(block.name)) ||
-            (blockMode === "excludes" && !blockList.includes(block.name));
-        if (mode && block.name !== 'air' && isInside(block, boundingBox)) { // mode
-            return block;
+        if (!structure) {
+            const listCheck = (blockMode === "includes" && blockList.includes(block.name)) ||
+                (blockMode === "excludes" && !blockList.includes(block.name));
+            if (listCheck && block.name !== 'air' && isInside(block, boundingBox)) {
+                return block;
+            }
+        } else {
+            const structBlock = offsetFromWorldBlock(structure,block);
+            if (!structBlock) console.log("StructBlock is null on algorithms -> spiral");
+            const isLastBlockPlaced = lastBlock && structBlock && structBlock.position === lastBlock.position && structBlock.name === lastBlock.name // FIXME structBlock is sometimes null
+            if (isInside(block, boundingBox) && structBlock && structBlock.name !== block.name && blockList.includes(structBlock.name) && !isLastBlockPlaced) { // TODO maybe should be checked for structures too. (buildmode)
+                /*
+                console.log("---------------");
+                console.log(structBlock.position);
+                console.log(block.position);
+                console.log("---------------");
+                 */
+                return structBlock;
+            }
         }
 
         // Move in the current direction
