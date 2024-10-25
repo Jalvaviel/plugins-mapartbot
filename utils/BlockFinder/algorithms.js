@@ -158,17 +158,16 @@ function spiral(bot, blockMode, blockList, boundingBox, structure = null, lastBl
                 return block;
             }
         } else {
-            const structBlock = offsetFromWorldBlock(structure,block);
-            if (!structBlock) console.log("StructBlock is null on algorithms -> spiral");
-            const isLastBlockPlaced = lastBlock && structBlock && structBlock.position === lastBlock.position && structBlock.name === lastBlock.name // FIXME structBlock is sometimes null
-            if (isInside(block, boundingBox) && structBlock && structBlock.name !== block.name && blockList.includes(structBlock.name) && !isLastBlockPlaced) { // TODO maybe should be checked for structures too. (buildmode)
-                /*
-                console.log("---------------");
-                console.log(structBlock.position);
-                console.log(block.position);
-                console.log("---------------");
-                 */
-                return structBlock;
+            if (isInside(block, boundingBox)) {
+                const structBlock = offsetFromWorldBlock(structure, block);
+                if (!structBlock) {
+                    console.log("StructBlock is null on algorithms -> spiral");
+                    return null;
+                }
+                const isLastBlockPlaced = lastBlock && structBlock && structBlock.position.equals(lastBlock.position)// && structBlock.name === lastBlock.name; // FIXME structBlock is sometimes null
+                if (structBlock && structBlock.name !== block.name && blockList.includes(structBlock.name) && !isLastBlockPlaced) { // TODO maybe should be checked for structures too. (buildmode)
+                    return structBlock;
+                }
             }
         }
 
@@ -207,7 +206,7 @@ function spiral(bot, blockMode, blockList, boundingBox, structure = null, lastBl
             stepsTaken = 0;
         }
     }
-
+    console.log("NBB wasn't found...");
     return null;
 }
 

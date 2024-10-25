@@ -80,8 +80,8 @@ class AutoEat {
                     console.log("Ran out of food, searching on the chest")
                     await this.inventoryManager.withdrawItems(this.foods[0], 64);
                 }
-                this.bot.emit('eat', {autoEat: this, eating: false});
             }
+            this.bot.emit('eat', {autoEat: this, eating: false});
         }
     }
 

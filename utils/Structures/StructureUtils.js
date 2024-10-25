@@ -17,7 +17,7 @@ function getMissingMats(materialList1,materialList2) { // The currentStructure v
     return sortKeysByValues(result);
 }
 
-function offsetFromWorldBlock(structure, worldBlock) {
+function offsetFromWorldBlock(structure, worldBlock) { // FIXME PROBLEMS HERE
     const boundingBox = structure.bbox;
     if (!(boundingBox[0].x <= worldBlock.position.x) || !(worldBlock.position.x <= boundingBox[1].x) ||
         !(boundingBox[0].y <= worldBlock.position.y) || !(worldBlock.position.y <= boundingBox[1].y) ||

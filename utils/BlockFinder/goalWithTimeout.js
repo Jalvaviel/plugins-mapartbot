@@ -1,5 +1,6 @@
 const {Vec3} = require("vec3");
 const { GoalNear } = require('mineflayer-pathfinder').goals;
+const { sleep } = require("mineflayer/lib/promise_utils");
 
 function getRandomInt(min, max) {
     min = Math.ceil(min);
@@ -40,24 +41,32 @@ async function goalWithTimeout(bot, goalPos, reach = 1, timeout = 40000) {
         }
     }
 }
+
+async function _wiggle(bot){
+    const movements = ["forward","backward","left","right"]
+    for (const movement of movements) {
+        bot.setControlState(movement,true);
+        await sleep(getRandomInt(1000,2000));
+        bot.setControlState(movement,false);
+    }
+}
 async function _checkMovement(bot, deltaVelocity, stuckTimeout) {
     let stuckTime = 0;
     return new Promise((resolve, reject) => {
         const movementCheck = setInterval(() => {
             const velocity = bot.entity.velocity.abs();
-            //console.log(velocity);
 
             if (velocity.x + velocity.y + velocity.z < deltaVelocity) {
-                console.log("I am speed:",bot.entity.velocity,velocity,velocity.x + velocity.y + velocity.z, deltaVelocity)
-                stuckTime += 1000;
+                stuckTime += 1000;  // Increase stuck time if the bot's velocity is too low
             } else {
                 stuckTime = 0;  // Reset stuck time if bot is moving
             }
 
             if (stuckTime >= stuckTimeout) {
-                console.log("Timeouts reached:",stuckTime,stuckTimeout)
+                console.log("Timeouts reached:", stuckTime, stuckTimeout);
                 clearInterval(movementCheck);  // Stop checking movement
-                resolve(false);  // Signal bot is stuck
+                //this.bot.setControlState('jump',true);
+                resolve(true);  // Signal bot is stuck
             }
         }, 1000);
     });
@@ -65,23 +74,30 @@ async function _checkMovement(bot, deltaVelocity, stuckTimeout) {
 
 async function goalWithDelta(bot, goalPos, reach = 1, stuckTimeout = 5000, deltaVelocity = 0.06) {
     const goal = new GoalNear(goalPos.x, goalPos.y, goalPos.z, reach);
-    let movementCheck;
+
     try {
         const stuck = await Promise.race([
-            bot.pathfinder.goto(goal),  // Try to reach the goal
-            _checkMovement(bot, deltaVelocity, stuckTimeout)  // Monitor if bot gets stuck
+            _checkMovement(bot, deltaVelocity, stuckTimeout),  // Monitor if bot gets stuck
+            bot.pathfinder.goto(goal).then(() => false)  // If pathfinder finishes, resolve with false (not stuck)
         ]);
 
         if (stuck) {
-            console.log('Bot is stuck, stopping and retrying...');
-            bot.pathfinder.stop();  // Stop current pathfinding
-            await goalWithDelta(bot, _getRandomGoal(bot,5), reach, stuckTimeout, deltaVelocity);  // Retry with another goal
-            //await goalWithDelta(bot, goalPos, reach);  // Retry with the same goal
+            console.log('Bot is stuck, wiggling...');
+            await _wiggle(bot);
+            //bot.pathfinder.stop();  // Stop current pathfinding
+            //await goalWithDelta(bot, _getRandomGoal(bot, 5), reach, stuckTimeout, deltaVelocity);  // Retry with another goal
+
         }
     } catch (e) {
-        //console.error('Pathfinding error:', e);
-    } finally {
-        clearInterval(movementCheck);  // Ensure movement check is stopped
+        console.error('Pathfinding error:', e);
+        await sleep(1000);
+        // THIS FUNCTION RUNS TWICE IN PARALLEL SOMETIMES
+        // Edge case, Likely error: "Path was stopped before it could be completed" It happens when the bot has picked up mats or eaten as last action (interrupted).
+        // Edge case, Likely error: "AssertionError [ERR_ASSERTION]: invalid control: ´wiggle_controlstate´ at bot.setControlState
+        // Sometimes in the stuck const, bot.pathfinder.goto resolves first. This is intentional,
+        // however sometimes it resolves first because there was an error while pathfinding due to it being stopped elsewhere in the code (eating action, replenishing action, etc.)
+        // This makes it so the code runs twice in parallel, is there any way to detect if the bot.pathfinder.goto resolves first and if it's due to an error,
+        // abort the whole goalWithDelta?
     }
 }
 

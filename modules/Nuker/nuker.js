@@ -144,7 +144,6 @@ class Nuker {
         switch (this.config.miningMode) {
             case "packet":
                 throw new Error("Not implemented on this version.")
-                break;
             default:
                 await this.equipBestTool(block);
                 try {
@@ -155,18 +154,15 @@ class Nuker {
         this.bot.emit("breakBlock", {'block': block, 'breaking': false});
     }
 
-    nearestNukerBlock() { // TODO WORKS
+    nearestNukerBlock() {
         const filter = this.config.blockMode === "includes" ? this.config.includes : this.config.excludes;
         switch (this.config.searchMode) {
             case "scanner":
                 return scanner(this.bot, this.config.blockMode, filter, this.boundingBox); // TODO change
-                break;
             case "spiral":
                 return spiral(this.bot, this.config.blockMode, filter, this.boundingBox, this.structure);
-                break;
             default:
                 return spiral(this.bot, this.config.blockMode, filter, this.boundingBox, this.structure);
-                break;
         }
     }
 
@@ -176,7 +172,7 @@ class Nuker {
         while (nnb) {
             //while (this.stop) sleep(100);
             if (this.stop) return;
-            const playerPos = this.bot.entity.position.floored();
+            const playerPos = this.bot.entity.position; //.floored();
             const nnbPos = nnb.position;
             if (nnbPos.distanceTo(playerPos) > this.config.range) {
                 await goalWithTimeout(this.bot,nnbPos)

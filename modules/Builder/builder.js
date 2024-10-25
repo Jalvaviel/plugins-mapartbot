@@ -102,8 +102,13 @@ class Builder {
         if (this.stop) return;
         this.bot.emit("placeBlock", {'block': block, 'placing': true });
         // Anti Doubles if (this.lastBlock && block.position === this.lastBlock.position) { return } // Anti Doubles
-        let mineflayerItem = await this.bot.inventory.findInventoryItem(block.name,null, false);
-        await this.bot.equip(mineflayerItem,"hand");
+        try {
+            let mineflayerItem = await this.bot.inventory.findInventoryItem(block.name, null, false);
+            await this.bot.equip(mineflayerItem, "hand");
+        } catch (e) { // Edge case Likely error: placed a double block and ran out of mats.
+            console.log(e) // e.message.includes('Invalid item object in equip')
+            return;
+        }
         if (block.position.distanceTo(botPos) < 1.5) {
             this.bot.setControlState('jump',true);
         }
@@ -120,7 +125,7 @@ class Builder {
         }
         this.bot.setControlState('jump',false);
         this.lastBlock = block;
-        //await sleep(40);
+        //await sleep(20);
 
         this.bot.emit("placeBlock", {'block': block, 'placing': false });
     }
@@ -136,19 +141,18 @@ class Builder {
 
     async buildStructure(currentStructure, worldStructure) { // TODO take into account the event system.
         this.bot.emit("buildStructure", {'structure': currentStructure, 'building': true });
-        //this.currentStructure = currentStructure;
-        //this.worldStructure = worldStructure;
         if (!this.materialList) { // In case another event occurs
             this.materialList = getMissingMats(currentStructure.materialList,worldStructure.materialList);
         }
         for (let material of Object.keys(this.materialList)) {
             let nbb = this.nearestBuilderBlock(material, currentStructure);
-            while (nbb) {
+            while (nbb !== null) {
                 if (this.stop) return;
                 await this.checkAndRefillMat(material);
                 const playerPos = this.bot.entity.position.floored();
                 const nbbPos = nbb.position;
                 if (nbbPos.distanceTo(playerPos) > this.config.range) {
+                    if (this.stop) return;
                     await goalWithDelta(this.bot,nbbPos,3);
                 }
                 await this.equipAndPlaceBlock(nbb, playerPos);

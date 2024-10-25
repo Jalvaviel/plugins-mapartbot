@@ -107,24 +107,25 @@ class InventoryManager {
         quantity = quantity >= this.config.maxWithdraw ? this.config.maxWithdraw : quantity;
         const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
         await goalWithDelta(this.bot, sorterChest.position);
-        const sorterChestInventory = await this.bot.openContainer(sorterChest);
-        /*
-        Uncaught Error: Event windowOpen did not fire within timeout of 20000ms
-        onceWithCleanup	promise_utils.js:62
-        once           	promise_utils.js:76
-        openBlock      	inventory.js:367
-        openContainer  	chest.js:19
-        withdrawItems  	inventoryManager.js:110
-         */
+        let sorterChestInventory;
+        try {
+            sorterChestInventory = await this.bot.openContainer(sorterChest);
+        } catch (e) {
+            console.log(e) // Edge case, likely error: "Event windowOpen did not fire within timeout of 20000ms"
+        }
         try {
             await sorterChestInventory.withdraw(materialId, null, quantity); //withNbt
             //await this.bot.window.withdraw(materialId, null, quantity, withNbt);
         } catch (e) {
-            // console.log(e)
+            console.log(e) // Edge case, likely error: "Can't find ´material_name´ in slots [0 - 27], (item id: ´material_id´)"
             // Inventory is full. Error: Can't find diorite in slots [0 - 27], (item id: 4)
             // Todo check other fallback chests.
         }
-        sorterChestInventory.close();
+        try {
+            sorterChestInventory.close();
+        } catch (e) {
+            console.log(e)
+        }
         this.bot.emit("withdrawItems", {material: material, quantity: quantity, withdrawing: false});
         return [material, quantity];
     }
