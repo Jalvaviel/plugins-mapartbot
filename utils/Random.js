@@ -20,4 +20,4 @@ function deepEqual(obj1, obj2) {
 
     return true;
 }
-module.exports = random;
+module.exports = { random };

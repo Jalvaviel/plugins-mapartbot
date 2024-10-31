@@ -1,9 +1,9 @@
 const {readFileSync} = require("fs");
 const  {boundingBox} = require("../BlockUtils/boundingBox");
 const  {Vec3} = require("vec3");
-const  {goalWithDelta} = require("../BlockFinder/goalWithTimeout");
 const stringToId = require("../stringToId");
 const { sleep } = require("mineflayer/lib/promise_utils");
+const {PathfinderPlus} = require("../Pathfinder/pathfinderPlus");
 
 class StorageSystem {
     constructor(world, boundingBox, size, materials = JSON.parse(readFileSync("./utils/InventoryManager/materials.json"))){
@@ -68,6 +68,7 @@ class InventoryManager {
     constructor(bot, config = JSON.parse(readFileSync("./utils/InventoryManager/config.json"))) {
         this.bot = bot;
         this.config = config;
+        this.pathfinderPlus = new PathfinderPlus(this.bot);
         this.storageSystem = this.setStorageSystem();
     }
     setStorageSystem(){
@@ -85,7 +86,9 @@ class InventoryManager {
             : await this.storageSystem.getMaterialChest(material);
         if (!sorterChest) return null;
         const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
-        await goalWithDelta(this.bot, sorterChest.position);
+        if (!this.bot.pathfinder.isMoving()) {
+            await this.pathfinderPlus.goalWithDelta(sorterChest.position);
+        }
         try {
             const sorterChestInventory = await this.bot.openContainer(sorterChest);
             await sorterChestInventory.deposit(materialId, null, quantity, withNbt);
@@ -106,25 +109,27 @@ class InventoryManager {
         if (!sorterChest) return null;
         quantity = quantity >= this.config.maxWithdraw ? this.config.maxWithdraw : quantity;
         const materialId = stringToId(this.bot.registry, material);  // Mineflayer has a problem with numerical Ids. Mojang started to get rid of them 10 years ago.
-        await goalWithDelta(this.bot, sorterChest.position);
+        if (!this.bot.pathfinder.isMoving()) {
+            await this.pathfinderPlus.goalWithDelta(sorterChest.position);
+        }
         let sorterChestInventory;
         try {
             sorterChestInventory = await this.bot.openContainer(sorterChest);
-        } catch (e) {
-            console.log(e) // Edge case, likely error: "Event windowOpen did not fire within timeout of 20000ms"
-        }
-        try {
             await sorterChestInventory.withdraw(materialId, null, quantity); //withNbt
-            //await this.bot.window.withdraw(materialId, null, quantity, withNbt);
-        } catch (e) {
-            console.log(e) // Edge case, likely error: "Can't find ´material_name´ in slots [0 - 27], (item id: ´material_id´)"
-            // Inventory is full. Error: Can't find diorite in slots [0 - 27], (item id: 4)
-            // Todo check other fallback chests.
-        }
-        try {
             sorterChestInventory.close();
         } catch (e) {
-            console.log(e)
+            if (e.message.includes("Can't find ")){ // Edge case, error: "Can't find ´material_name´ in slots [0 - 27], (item id: ´material_id´)" -> Caused by taking all items from the chest, just ignore.
+                sorterChestInventory.close();
+            }
+            if (e.message.includes("Event windowOpen did not fire within timeout")) { // Edge case, error: "Event windowOpen did not fire within timeout of 20000ms" -> Caused if the bot gets stuck pathfinding, just return quantity 0
+                quantity = 0;
+            }
+            if (e.message.includes("Cannot read properties of null (reading 'type')")) { // Edge case, error: "Cannot read properties of null (reading 'type') at clickDest -> TODO
+                console.log(e);
+                sorterChestInventory.close();
+            }
+
+            // Todo check other fallback chests.
         }
         this.bot.emit("withdrawItems", {material: material, quantity: quantity, withdrawing: false});
         return [material, quantity];
@@ -133,7 +138,9 @@ class InventoryManager {
         const sorterChest = this.config.hasSorter ? await this.storageSystem.getMaterialChest(this.config.sorterBlock)
             : await this.storageSystem.getMaterialChest(item.name);
         if (!sorterChest) return null;
-        await goalWithDelta(this.bot, sorterChest.position);
+        if (!this.bot.pathfinder.isMoving()) {
+            await this.pathfinderPlus.goalWithDelta(sorterChest.position);
+        }
         const sorterChestInventory = await this.bot.openContainer(sorterChest);
         try {
             //await sorterChestInventory.(item, 0, sorterChestInventory.inventoryStart-1, false);

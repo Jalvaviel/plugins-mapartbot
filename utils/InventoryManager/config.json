@@ -5,5 +5,5 @@
   "materialStoragePath": ".\\minecraft\\materialstorage.json",
   "hasSorter": true,
   "sorterBlock": "barrel",
-  "maxWithdraw": 1728
+  "maxWithdraw": 1664
 }

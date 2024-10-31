@@ -38,25 +38,42 @@ class AutoEat {
                 }
             }
         });
-        this.bot.on('eat', async (eatEvent) => {
-            if (this.isActive) {
-                if (eatEvent.eating) {
-                    this.stop = true;
-                    await this.deactivate();
-                } else {
-                    this.stop = false;
-                    await this.activate();
+    }
+    async eat () {
+        if (this.bot.food < this.config.threshold && !this.stop) {
+            this.bot.emit('eat', {autoEat: this, eating: true});
+            //clearInterval(this.eatInterval);
+            while (this.bot.food < 20) {
+                let foodItem;
+                for (let foodString of this.foods) {
+                    foodItem = this.bot.inventory.findInventoryItem(foodString);
+                    if (foodItem) break;
+                }
+                try {
+                    await this.bot.equip(foodItem, this.config.offhand ? 'off-hand' : 'hand'); // Equip food item
+                    const foodCount = this.bot.heldItem.count
+                    this.bot.deactivateItem();
+                    this.bot.activateItem();
+                    while (this.bot.heldItem && this.bot.heldItem.count === foodCount) { // && this.bot.heldItem.count === initialCount
+                        //console.log('eating')
+                        await sleep(1);
+                    }
+                } catch (e) {
+                    throw new Error("The food item wasn't found / able to be equipped...");
                 }
             }
-        });
+            this.bot.emit('eat', {autoEat: this, eating: false});
+            //this.activate();
+        }
     }
 
-    async eat(){
+/*
+    async eat(){ // FIXME Abnormal delay when eating -> silent papermc crash.
         if (this.bot.food < this.config.threshold) {
             this.bot.emit('eat', {autoEat: this, eating: true});
             console.log('eating')
-            while (this.bot.food < 20) { // FIXME
-                let foodFound = false;
+            //while (this.bot.food < 20) { // FIXME
+                let foodFound = false; // EDGE CASE sometimes it doesn't detect food when it has plenty
                 for (const item of this.bot.inventory.items()) {
                     if (this.foods.includes(item.name)) {
                         foodFound = true;
@@ -80,11 +97,11 @@ class AutoEat {
                     console.log("Ran out of food, searching on the chest")
                     await this.inventoryManager.withdrawItems(this.foods[0], 64);
                 }
-            }
+            //}
             this.bot.emit('eat', {autoEat: this, eating: false});
         }
     }
-
+ */
     activate() {
         this.isActive = true;
         this.eatInterval = setInterval(async ()=> {

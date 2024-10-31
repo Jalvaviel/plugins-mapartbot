@@ -164,8 +164,27 @@ function spiral(bot, blockMode, blockList, boundingBox, structure = null, lastBl
                     console.log("StructBlock is null on algorithms -> spiral");
                     return null;
                 }
-                const isLastBlockPlaced = lastBlock && structBlock && structBlock.position.equals(lastBlock.position)// && structBlock.name === lastBlock.name; // FIXME structBlock is sometimes null
-                if (structBlock && structBlock.name !== block.name && blockList.includes(structBlock.name) && !isLastBlockPlaced) { // TODO maybe should be checked for structures too. (buildmode)
+                let isInLastBlocks = false;
+                if (lastBlock && lastBlock.length > 0) {
+                    for (let blockPos of lastBlock) {
+                        if (structBlock.position && blockPos && blockPos.equals(structBlock.position)) {
+                            /*
+                            Uncaught TypeError: Cannot read properties of null (reading 'x') //FIXME THIS HAPPENS BECAUSE MATERIAL HAS RUN OUT and that material is complete!
+equals                   	index.js:151
+spiral                   	algorithms.js:170
+nearestBuilderBlock      	builder.js:92
+buildStructure           	builder.js:162
+processTicksAndRejections	task_queues:95
+runNextTicks             	task_queues:64
+processTimers            	timers:511
+                             */
+                            isInLastBlocks = true;
+                            break;
+                        }
+                    }
+                }
+                //const isLastBlockPlaced = lastBlock && structBlock && structBlock.position.equals(lastBlock.position)// && structBlock.name === lastBlock.name; // FIXME structBlock is sometimes null
+                if (structBlock && structBlock.name !== block.name && blockList.includes(structBlock.name) && !isInLastBlocks) { // TODO maybe should be checked for structures too. (buildmode)
                     return structBlock;
                 }
             }

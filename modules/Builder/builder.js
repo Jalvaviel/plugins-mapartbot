@@ -5,10 +5,11 @@ const Structure = require("../../utils/Structures/Structure");
 const {boundingBox, isInside} = require("../../utils/BlockUtils/boundingBox");
 const {Vec3} = require("vec3");
 const {scanner, spiral} = require("../../utils/BlockFinder/algorithms");
-const {goalWithDelta, goalWithTimeout} = require("../../utils/BlockFinder/goalWithTimeout");
+
 const { sleep } = require("mineflayer/lib/promise_utils");
 const {getMissingMats, parseNbt} = require("../../utils/Structures/StructureUtils");
 const {resolve} = require("path");
+const {PathfinderPlus} = require("../../utils/Pathfinder/pathfinderPlus");
 
 class Builder {
     constructor(bot, nuker = null, config = JSON.parse(readFileSync('./modules/Builder/config.json'))) {
@@ -18,11 +19,12 @@ class Builder {
             ? boundingBox(this.bot.entity.position)
             : [new Vec3(...this.config.boundingBox.slice(0, 3)), new Vec3(...this.config.boundingBox.slice(3, 6))];
         this.inventoryManager = new InventoryManager(this.bot);
-        this.nuker = nuker;
+        //this.nuker = nuker;
+        this.pathfinderPlus = new PathfinderPlus(this.bot);
 
         this.structureFolder = readdirSync(resolve(this.config.structureFolder)).filter(file => file.endsWith('.nbt'));
         this.materialList = null;
-        this.lastBlock = null;
+        this.lastBlocks = [];
 
         this.bot.physics.yawSpeed = 1000;
         this.bot.physics.pitchSpeed = 1000;
@@ -31,14 +33,13 @@ class Builder {
         this.isActive = false;
         this.addListeners();
     }
-
     addListeners() {
         this.bot.on('eat', async (eatEvent) => {
             if (this.isActive) {
                 if (eatEvent.eating) {
                     //console.log("eating")
                     this.stop = true;
-                    try {this.bot.pathfinder.stop()} catch (e) {}
+                    //try {this.bot.pathfinder.stop()} catch (e) {}
                 } else {
                     this.stop = false;
                     await this.activate();
@@ -70,7 +71,6 @@ class Builder {
                 }
             }
         });
-
     }
 
     async activate() {
@@ -89,7 +89,7 @@ class Builder {
                 return scanner(this.bot, currentMaterial, this.boundingBox);
                 break;
             case "spiral":
-                return spiral(this.bot, this.config.blockMode, currentMaterial, this.boundingBox, currentStructure, this.lastBlock);
+                return spiral(this.bot, this.config.blockMode, currentMaterial, this.boundingBox, currentStructure, this.lastBlocks);
                 break;
             default:
                 return spiral(this.bot, currentMaterial, this.boundingBox);
@@ -100,6 +100,7 @@ class Builder {
     async equipAndPlaceBlock(block, botPos) { // TODO add more modes
         //await this.checkAndRefillMat(block.name);
         if (this.stop) return;
+        if (block.position.distanceTo(botPos) > this.config.range) return;
         this.bot.emit("placeBlock", {'block': block, 'placing': true });
         // Anti Doubles if (this.lastBlock && block.position === this.lastBlock.position) { return } // Anti Doubles
         try {
@@ -124,7 +125,8 @@ class Builder {
                 break;
         }
         this.bot.setControlState('jump',false);
-        this.lastBlock = block;
+        this.lastBlocks.push(block.position);
+        if (this.lastBlocks.length > 2) {this.lastBlocks.shift()}
         //await sleep(20);
 
         this.bot.emit("placeBlock", {'block': block, 'placing': false });
@@ -147,13 +149,12 @@ class Builder {
         for (let material of Object.keys(this.materialList)) {
             let nbb = this.nearestBuilderBlock(material, currentStructure);
             while (nbb !== null) {
-                if (this.stop) return;
+                await sleep(200);
                 await this.checkAndRefillMat(material);
                 const playerPos = this.bot.entity.position.floored();
                 const nbbPos = nbb.position;
-                if (nbbPos.distanceTo(playerPos) > this.config.range) {
-                    if (this.stop) return;
-                    await goalWithDelta(this.bot,nbbPos,3);
+                if (nbbPos.distanceTo(playerPos) > this.config.range && !this.stop) {
+                    await this.pathfinderPlus.goalWithDelta(nbbPos, this.config.range-1); // FIXME
                 }
                 await this.equipAndPlaceBlock(nbb, playerPos);
                 nbb = this.nearestBuilderBlock(material, currentStructure);
